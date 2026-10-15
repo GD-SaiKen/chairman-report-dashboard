@@ -1,0 +1,138 @@
+/* ==========================================================================
+   tokens.css — 设计令牌层（Design Tokens）
+   本文件只声明 CSS 自定义属性，不写任何布局/组件选择器。
+   任何换肤、调色、改字号的需求，都应在本文件内完成。
+   ========================================================================== */
+
+:root {
+  /* ---------- 品牌色阶（白蓝规范，主色唯一，不另起一套） ---------- */
+  --brand-700: #24499e;
+  --brand-600: #2e5bc4; /* 正文级品牌色：白底对比度 ≈ 6.2:1 */
+  --brand-500: #3b6fe0; /* 品牌主色：用于填充、描边、焦点环 */
+  --brand-200: #b9ccf0; /* 品牌浅描边：hover 抬边 */
+  --brand-100: #dce7fb;
+  --brand-050: #eaf1fd; /* 品牌浅底：图标底座、选中态 */
+
+  /* ---------- 语义色（只用于「状态」，不用于装饰） ---------- */
+  --danger-600: #a92f28;
+  --danger-500: #c23b33; /* 红灯 / 阻断 / 紧急 */
+  --danger-050: #fcebeb;
+  --warn-700: #8c5a1b; /* 黄底上的深字，保证 ≥4.5:1 */
+  --warn-500: #d9822b; /* 黄灯 / 待办 / 需沟通 */
+  --warn-050: #fcf1e3;
+  --ok-500: #22a06b; /* 已闭环 / 正常 */
+  --ok-050: #e7f6ef;
+
+  /* ---------- 中性色阶 ----------
+     ink-900 / ink-600 是仅有的两种正文文字色，均满足 WCAG AA（≥4.5:1）。
+     ink-400 / ink-300 为「装饰专用」，禁止承载需要阅读的文字。 */
+  --ink-900: #1f2733;
+  --ink-700: #3a4453;
+  --ink-600: #5d6b7d;
+  --ink-400: #8a94a6; /* 仅图标、分隔线、禁用态 */
+  --ink-300: #aeb7c4; /* 仅骨架屏、占位块 */
+  --line: #e3e8f0;
+  --line-strong: #cdd6e3;
+  --canvas: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f4f9;
+  --surface-3: #e9eef6;
+  --on-brand: #ffffff;
+
+  /* ---------- 字体 ---------- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* 字阶：11 仅用于来源徽标；12 元信息；13 正文；14 小标题；20/28 标题 */
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-17: 17px;
+  --fs-22: 22px;
+  --fs-30: 30px;
+  --lh-tight: 1.2;
+  --lh-base: 1.6;
+  --ls-tight: -0.01em;
+
+  /* ---------- 间距（4 的倍数，禁止魔法数字） ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ---------- 圆角 ---------- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* ---------- 阴影（仅三级，越靠前层级越低） ---------- */
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.05);
+  --shadow-2: 0 4px 14px rgba(16, 24, 40, 0.08);
+  --shadow-3: 0 16px 40px rgba(16, 24, 40, 0.16);
+  --ring: 0 0 0 3px rgba(59, 111, 224, 0.28);
+
+  /* ---------- 动效 ---------- */
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 460ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---------- 布局骨架 ---------- */
+  --sidebar-w: 248px;
+  --topbar-h: 60px;
+  --content-max: 1200px;
+  --z-backdrop: 40;
+  --z-sidebar: 50;
+  --z-topbar: 30;
+  --z-toast: 80;
+}
+
+/* ==========================================================================
+   暗色主题：只覆写令牌，组件样式零改动 —— 这就是「换肤」的落地方式
+   ========================================================================== */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --brand-700: #a8c3ff;
+  --brand-600: #8fb0ff; /* 暗底上需要更亮的品牌色才够对比度 */
+  --brand-500: #6391f5;
+  --brand-200: #33456a;
+  --brand-100: rgba(99, 145, 245, 0.24);
+  --brand-050: rgba(99, 145, 245, 0.14);
+
+  --danger-600: #ffb3ac;
+  --danger-500: #ef8078;
+  --danger-050: rgba(239, 128, 120, 0.14);
+  --warn-700: #f2c68c;
+  --warn-500: #e9a853;
+  --warn-050: rgba(233, 168, 83, 0.14);
+  --ok-500: #4fbf8b;
+  --ok-050: rgba(79, 191, 139, 0.14);
+
+  --ink-900: #e8edf5;
+  --ink-700: #c3ccda;
+  --ink-600: #9aa8bd;
+  --ink-400: #6e7c92;
+  --ink-300: #3a4757;
+  --line: #26313f;
+  --line-strong: #3a4757;
+  --canvas: #0f141b;
+  --surface: #161d27;
+  --surface-2: #1c2530;
+  --surface-3: #222d3a;
+  --on-brand: #0b1220;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 18px 48px rgba(0, 0, 0, 0.6);
+  --ring: 0 0 0 3px rgba(99, 145, 245, 0.4);
+}
