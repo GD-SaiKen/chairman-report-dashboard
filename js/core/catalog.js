@@ -73,7 +73,7 @@ export function normalize(raw) {
 
   return {
     site: {
-      title: toText(site.title, "董事长驾驶舱"),
+      title: toText(site.title, "信息部与 Hermes 项目报告"),
       subtitle: toText(site.subtitle, ""),
     },
     periods,
@@ -139,7 +139,7 @@ export function summarize(period) {
     decisions: period.decisions.length,
     reports: period.reports.length,
     meters: period.meters.length,
-    // 结论数量用一个「需要董事长留意」的口径收口
+    // 结论数量用一个「需要管理层留意」的口径收口
     headline: `${red} 项红灯、${amber} 项黄灯，${period.decisions.length} 项待决策`,
   };
 }

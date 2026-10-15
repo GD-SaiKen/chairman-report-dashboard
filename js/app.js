@@ -97,7 +97,7 @@ function renderReady(state) {
     views.renderSidebarFoot(period)
   );
 
-  /* 主区：结论条 → 仪表带 → 三块舱 → 两扇门 */
+  /* 主区：结论条 → 仪表带 → 三块区 → 两扇门 */
   mount(
     refs.main,
     views.renderHero(catalog.site, period, stats),

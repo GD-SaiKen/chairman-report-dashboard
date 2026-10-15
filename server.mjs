@@ -78,5 +78,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`董事长驾驶舱已启动  →  http://localhost:${PORT}`);
+  console.log(`信息部与 Hermes 项目报告已启动  →  http://localhost:${PORT}`);
 });

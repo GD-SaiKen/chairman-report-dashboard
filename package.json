@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "董事长驾驶舱：信息部与 Hermes 项目报告的一屏判断面板（零依赖静态站点）",
+  "description": "信息部与 Hermes 项目报告的一屏判断面板（零依赖静态站点）",
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs"

@@ -24,7 +24,7 @@ export function renderBrand(site) {
   );
 }
 
-/** 舱面锚点 + 报告全文入口 */
+/** 概览锚点 + 报告全文入口 */
 export function renderNav(period) {
   const cockpit = [
     { href: "#meters", icon: "gauge", label: "仪表带" },
@@ -55,8 +55,8 @@ export function renderNav(period) {
 
   return h(
     "nav",
-    { class: "nav", "aria-label": "驾驶舱导航" },
-    h("p", { class: "nav__group", text: "舱面" }),
+    { class: "nav", "aria-label": "报告导航" },
+    h("p", { class: "nav__group", text: "概览" }),
     cockpit,
     h("p", { class: "nav__group", text: "报告全文" }),
     reports.length ? reports : h("p", { class: "nav__group", text: "暂无报告" })
@@ -193,7 +193,7 @@ export function renderMeters(period) {
   return section({
     id: "meters",
     title: "仪表带",
-    note: "口径分源，舱内不做跨报告加总",
+    note: "口径分源，站内不做跨报告加总",
     children: [h("ul", { class: "kpi" }, cards)],
   });
 }
@@ -337,7 +337,7 @@ export function renderDoors(period) {
   return section({
     id: "reports",
     title: "报告全文",
-    note: "舱内只做判断，细节回到原文",
+    note: "站内只做判断，细节回到原文",
     children: [h("div", { class: "doors" }, doors)],
   });
 }
@@ -349,7 +349,7 @@ export function renderLoading() {
     "div",
     { class: "section", role: "status", "aria-live": "polite" },
     h("div", { class: "kpi" }, Array.from({ length: 6 }, () => h("div", { class: "skeleton" }))),
-    h("p", { class: "sr-only", text: "正在加载驾驶舱数据" })
+    h("p", { class: "sr-only", text: "正在加载报告数据" })
   );
 }
 
@@ -358,7 +358,7 @@ export function renderError(message) {
     "div",
     { class: "state", role: "alert" },
     h("div", { class: "state__icon", "aria-hidden": "true" }, icon("alert-triangle", "20")),
-    h("h2", { class: "state__title", text: "驾驶舱未能加载" }),
+    h("h2", { class: "state__title", text: "数据未能加载" }),
     h("p", { class: "state__text", text: message }),
     h(
       "p",
