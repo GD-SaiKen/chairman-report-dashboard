@@ -85,3 +85,16 @@ a.report-return__icon {
     display: none !important;
   }
 }
+
+/* ≤900px：左上角悬浮按钮会压住报告页自身的顶部导航（2026-10-15 实测「报告构成」被挡），
+   窄屏改到左下；body 补下边距避免压住页脚。 */
+@media (max-width: 900px) {
+  a.report-return {
+    top: auto;
+    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+
+  body {
+    padding-bottom: 56px;
+  }
+}

@@ -33,6 +33,12 @@ ol {
   list-style: none;
 }
 
+/* [hidden] 兜底：作者样式（含 @media 内）的 display 会覆盖 UA 的 [hidden]{display:none}。
+   2026-10-15 事故：≤960px 下 .backdrop{display:block} 让隐形遮罩吞掉全站点击 */
+[hidden] {
+  display: none !important;
+}
+
 button {
   font: inherit;
   color: inherit;
