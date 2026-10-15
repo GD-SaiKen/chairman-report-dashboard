@@ -1,0 +1,87 @@
+/* 报告全文页固定悬浮返回入口（各期 reports 全文 index.html 引用） */
+
+a.report-return {
+  box-sizing: border-box;
+  position: fixed;
+  top: max(20px, env(safe-area-inset-top, 0px));
+  left: max(20px, env(safe-area-inset-left, 0px));
+  right: auto;
+  bottom: auto;
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 14px 8px 11px;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: #3b6fe0;
+  color: #fff !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-decoration: none !important;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 6px 18px rgba(36, 73, 158, 0.28),
+    0 2px 5px rgba(16, 24, 40, 0.1);
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+a.report-return:hover {
+  background: #2e5bc4;
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff !important;
+  box-shadow:
+    0 10px 28px rgba(36, 73, 158, 0.38),
+    0 4px 10px rgba(16, 24, 40, 0.14);
+  transform: translateY(-2px);
+}
+
+a.report-return:active {
+  transform: translateY(0);
+  box-shadow:
+    0 4px 14px rgba(36, 73, 158, 0.28),
+    0 1px 4px rgba(16, 24, 40, 0.1);
+}
+
+a.report-return:focus-visible {
+  outline: 2px solid #3b6fe0;
+  outline-offset: 3px;
+}
+
+a.report-return__icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+}
+
+@media (max-width: 480px) {
+  a.report-return {
+    top: max(14px, env(safe-area-inset-top, 0px));
+    left: max(14px, env(safe-area-inset-left, 0px));
+    min-height: 34px;
+    padding: 7px 12px 7px 10px;
+    font-size: 12px;
+  }
+}
+
+@media print {
+  a.report-return {
+    display: none !important;
+  }
+}

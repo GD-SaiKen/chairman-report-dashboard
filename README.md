@@ -57,7 +57,8 @@ chairman-report-dashboard/
 ├─ index.html            # 语义化外壳 + 内联图标 sprite（无内联样式与脚本）
 ├─ css/
 │  ├─ tokens.css         # 设计令牌：色板 / 字阶 / 间距 / 圆角 / 阴影 / 动效 + 暗色覆盖
-│  └─ app.css            # Reset → Base → A11y 工具类 → 布局 → 组件 → 状态 → 动效 → 响应式
+│  ├─ app.css            # Reset → Base → A11y 工具类 → 布局 → 组件 → 状态 → 动效 → 响应式
+│  └─ report-return.css  # 全文页左上角「首页」悬浮入口
 ├─ js/
 │  ├─ core/
 │  │  ├─ dom.js          # h() / icon() / mount() / countUp() 等无依赖工具
@@ -67,7 +68,7 @@ chairman-report-dashboard/
 │  └─ app.js             # 装配层：唯一持有状态与副作用的文件
 ├─ server.mjs            # 零依赖本地静态服务
 ├─ data/catalog.json     # 唯一数据源（未改动）
-└─ reports/…             # 两份报告全文（未改动）
+└─ reports/…             # 报告全文；入口页引用 report-return.css
 ```
 
 **分层约束**：`views.js` 与 `core/catalog.js` 都不接触 DOM，可单独单元测试；所有事件监听、观察器、定时器集中在 `app.js`，保证重渲染时先销毁再重建。
@@ -132,7 +133,20 @@ reports/{YYYY-MM-DD}_{YYYY-MM-DD}/
 规则：
 
 - 每个报告一个子目录，入口文件必须叫 `index.html`（`localPath` 直链该文件）。
-- 报告自带的 css/图片放在同一子目录，用相对路径引用；不要改站点的 `css/`、`js/`。
+- 在全文 `index.html` 的 `<head>` 引用样式，并在 `</body>` 前加入返回首页入口（相对路径向上三级到站点根）：
+
+```html
+<link rel="stylesheet" href="../../../css/report-return.css">
+```
+
+```html
+<a class="report-return" href="../../../index.html" aria-label="返回报告首页">
+  <svg class="report-return__icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+  首页
+</a>
+```
+
+- 报告自带的 css/图片放在同一子目录，用相对路径引用；不要改站点的 `css/`、`js/`（`report-return.css` 除外，由全文页引用）。
 - `onlineUrl` 可选：有 WorkBuddy 等线上原件就填，没有可只保留 `localPath`。
 
 ### 6.2 登记 catalog.json
