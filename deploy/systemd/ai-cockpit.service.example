@@ -1,0 +1,24 @@
+[Unit]
+Description=Company AI Cockpit
+After=network.target
+
+[Service]
+Type=simple
+User=ai-cockpit
+Group=ai-cockpit
+WorkingDirectory=/srv/company-ai-cockpit
+ExecStart=/usr/bin/node /srv/company-ai-cockpit/server.mjs
+Environment=HOST=127.0.0.1
+Environment=PORT=5175
+Environment=AI_COCKPIT_STORAGE=/var/lib/company-ai-cockpit
+Environment=AI_COCKPIT_ORIGIN=https://ai-cockpit.example.com
+EnvironmentFile=/etc/company-ai-cockpit/import.env
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/company-ai-cockpit /srv/company-ai-cockpit/data /srv/company-ai-cockpit/reports /srv/company-ai-cockpit/.publish-tmp
+
+[Install]
+WantedBy=multi-user.target

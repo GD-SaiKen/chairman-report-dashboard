@@ -8,7 +8,8 @@
     "start": "node server.mjs",
     "dev": "node server.mjs",
     "test": "node --test",
-    "check": "node --test && node --check js/app.js",
+    "check": "node --test && node --check js/app.js && node --check manage/import/app.js && node --check server/app.mjs",
+    "import:check": "node scripts/check-import-storage.mjs",
     "snapshot:build": "node scripts/build-snapshot.mjs",
     "snapshot:validate": "node scripts/validate-snapshot.mjs",
     "radar:collect": "node scripts/collect-radar.mjs"

@@ -266,7 +266,34 @@ ssh -T git@github.com-chairman-report
 
 ---
 
-## 七、可访问性清单
+## 八、HTML 报告导入与审核发布
+
+管理工作台位于 `/manage/import/`，不出现在普通导航中。该路径只是降低误触，页面和 `/api/import/` 必须与驾驶舱共用 Nginx Basic Auth。
+
+操作流程：创建期次、上传多份 UTF-8 HTML、开始解析、处理阻断问题、填写审核人、确认发布。未配置 AI Provider 时系统保留规则提取结果并提示人工补齐，不会因缺少模型而丢失上传文件。
+
+生产环境变量：
+
+```text
+AI_COCKPIT_STORAGE=/var/lib/company-ai-cockpit
+AI_COCKPIT_ORIGIN=https://ai-cockpit.example.com
+AI_EXTRACTION_ENDPOINT=https://<approved-provider>/extract
+AI_EXTRACTION_API_KEY=<仅保存在服务器环境文件>
+AI_EXTRACTION_MODEL=<approved-model>
+IMPORT_MAX_FILE_BYTES=10485760
+IMPORT_MAX_PERIOD_BYTES=41943040
+```
+
+部署前运行：
+
+```powershell
+npm run import:check
+npm run check
+```
+
+备份必须同时包含 `AI_COCKPIT_STORAGE`、`data/manifest.json`、`data/snapshots/` 和 `reports/`。模型密钥、Basic Auth 文件、上传原件和草稿不得提交 Git。故障恢复优先选择管理工作台中的已发布版本回滚；发布失败时保留当前 manifest，不手工拼接半份快照。
+
+## 九、可访问性清单
 
 - 语义化：`aside` / `header` / `main` / `nav` / `section[aria-labelledby]` / `article` / `footer`，一级 `h1` 唯一。
 - 键盘：首个焦点是「跳到主要内容」skip link；全站 `:focus-visible` 统一 2px 焦点环；移动端抽屉支持 `Esc` 关闭与 `Tab` 循环，收起时置 `inert` 使其对 Tab 键完全不可达。

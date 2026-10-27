@@ -2,13 +2,25 @@ server {
     listen 443 ssl;
     server_name ai-cockpit.example.com;
 
-    root /srv/company-ai-cockpit;
-    index index.html;
+    client_max_body_size 12m;
 
-    # 页面、快照 JSON、报告全文统一受同一层门禁保护。
+    location /api/import/ {
+        auth_basic "Company AI Cockpit";
+        auth_basic_user_file /etc/nginx/secrets/ai-cockpit.htpasswd;
+        proxy_pass http://127.0.0.1:5175;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_no_cache 1;
+    }
+
+    # 页面、管理掩门、快照 JSON 与报告全文使用同一门禁。
     location / {
         auth_basic "Company AI Cockpit";
         auth_basic_user_file /etc/nginx/secrets/ai-cockpit.htpasswd;
-        try_files $uri $uri/ /index.html;
+        proxy_pass http://127.0.0.1:5175;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
