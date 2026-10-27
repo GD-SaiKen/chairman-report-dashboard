@@ -4,5 +4,8 @@
 data/inbox/
 .env
 .env.*
+storage/
+.publish-tmp/
+*.upload-part
 .DS_Store
 Thumbs.db
