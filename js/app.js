@@ -7,15 +7,23 @@
  */
 
 import { createStore } from "./core/store.js";
-import { loadCatalog, summarize, CatalogError } from "./core/catalog.js";
-import { h, qs, mount, icon, countUp, isCompact } from "./core/dom.js";
-import * as views from "./ui/views.js";
+import { loadManifest, loadSnapshot, selectPeriod, DashboardDataError } from "./core/dashboard-data.js";
+import { parseRoute, routeQuery, subscribeRoute } from "./core/router.js";
+import { qs, mount, icon, isCompact } from "./core/dom.js";
+import { renderBrand, renderNav, renderSidebarFoot, selectField } from "./ui/shell.js";
+import { renderOverview } from "./ui/overview.js";
+import { renderDepartments } from "./ui/departments.js";
+import { renderDemands } from "./ui/demands.js";
+import { renderCapabilities } from "./ui/capabilities.js";
+import { renderTokens } from "./ui/tokens.js";
+import { renderRadar } from "./ui/radar.js";
+import { qualityBadge } from "./ui/shared.js";
 
 /* ------------------------------ 常量 ------------------------------ */
 
-const CATALOG_URL = "data/catalog.json";
+const MANIFEST_URL = "data/manifest.json";
 const STORAGE = { theme: "crd:theme", period: "crd:period" };
-const SECTION_IDS = ["meters", "judgments", "risks", "decisions"];
+const SECTION_IDS = ["overview", "departments", "demands", "capabilities", "tokens", "radar"];
 const MOBILE_BREAKPOINT = "(max-width: 960px)";
 
 /* ------------------------------ DOM 引用 ------------------------------ */
@@ -38,15 +46,18 @@ const refs = {
 
 const store = createStore({
   status: "loading", // loading | ready | error
-  catalog: null,
+  manifest: null,
+  snapshot: null,
   periodId: null,
+  route: parseRoute(location.hash),
+  query: routeQuery(location.hash),
   error: "",
   theme: readTheme(),
 });
 
 /** 当前期次对象 */
 const currentPeriod = (state) =>
-  state.catalog && state.catalog.periods.find((p) => p.id === state.periodId);
+  state.manifest && selectPeriod(state.manifest, state.periodId);
 
 /* ------------------------------ 侧效果容器 ------------------------------ */
 
@@ -65,12 +76,12 @@ function render(state) {
   syncThemeButton(state.theme);
 
   if (state.status === "loading") {
-    mount(refs.main, views.renderLoading());
+    mount(refs.main, loadingView());
     return;
   }
 
   if (state.status === "error") {
-    mount(refs.main, views.renderError(state.error));
+    mount(refs.main, errorView(state.error));
     refs.periodHost.replaceChildren();
     refs.crumb.replaceChildren();
     return;
@@ -80,40 +91,53 @@ function render(state) {
 }
 
 function renderReady(state) {
-  const { catalog } = state;
+  const { manifest, snapshot } = state;
   const period = currentPeriod(state);
-  const stats = summarize(period);
+  const quality = snapshot?.quality || { status: "missing", warnings: ["质量文件不可用"] };
 
   /* 顶栏：面包屑 + 期次下拉 */
   refs.crumb.textContent = period.label;
-  refs.periodHost.replaceChildren(views.selectField(catalog, period.id));
+  refs.periodHost.replaceChildren(selectField(manifest, period.id), qualityBadge(quality));
   qs("#period-select").addEventListener("change", onPeriodChange);
 
   /* 侧栏：品牌 / 锚点 / 报告入口 */
   mount(
     refs.sidebar,
-    views.renderBrand(catalog.site),
-    views.renderNav(period),
-    views.renderSidebarFoot(period)
+    renderBrand(manifest.site),
+    renderNav(state.route),
+    renderSidebarFoot(period, qualityBadge(quality))
   );
 
   /* 主区：结论条 → 仪表带 → 三块区 → 两扇门 */
   mount(
     refs.main,
-    views.renderHero(catalog.site, period, stats),
-    views.renderMeters(period),
-    h(
-      "div",
-      { class: "grid-3" },
-      views.renderJudgments(period),
-      views.renderRisks(period),
-      views.renderDecisions(period)
-    ),
-    views.renderDoors(period),
-    views.renderFoot(period)
+    renderRoute(state.route, snapshot, state.query)
   );
 
   afterRender();
+}
+
+function renderRoute(route, snapshot, query) {
+  if (route === "departments") return renderDepartments(snapshot, query);
+  if (route === "demands") return renderDemands(snapshot, query);
+  if (route === "capabilities") return renderCapabilities(snapshot, query);
+  if (route === "tokens") return renderTokens(snapshot, query);
+  if (route === "radar") return renderRadar(snapshot, query);
+  return renderOverview(snapshot, query);
+}
+
+function loadingView() {
+  const el = document.createElement("section");
+  el.className = "dash-empty dashboard-page";
+  el.innerHTML = "<strong>正在加载公司 AI 运转快照…</strong><span>正在读取期次清单与专题数据</span>";
+  return el;
+}
+
+function errorView(message) {
+  const el = document.createElement("section");
+  el.className = "dash-empty dashboard-page";
+  el.innerHTML = `<strong>数据加载失败</strong><span>${String(message || "未知错误")}</span>`;
+  return el;
 }
 
 /** 每次重渲染后重建所有观察器与定时器（先销毁，后创建） */
@@ -134,8 +158,6 @@ function observeReveal() {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         entry.target.classList.add("is-in");
-        const number = entry.target.querySelector("[data-count]");
-        if (number) countUp(number, number.dataset.count);
         revealObserver.unobserve(entry.target);
       }
     },
@@ -242,8 +264,8 @@ function toggleTheme() {
 
 function onPeriodChange(event) {
   const nextId = event.target.value;
-  const catalog = store.get().catalog;
-  const next = catalog.periods.find((p) => p.id === nextId);
+  const manifest = store.get().manifest;
+  const next = manifest?.periods.find((p) => p.id === nextId);
   if (!next) return;
 
   try {
@@ -252,8 +274,13 @@ function onPeriodChange(event) {
     /* 忽略写入失败 */
   }
 
-  store.set({ periodId: nextId });
-  announce(`已切换到 ${next.label}，数据窗口 ${next.window}`);
+  store.set({ status: "loading", periodId: nextId });
+  loadSnapshot(manifest, nextId).then((snapshot) => {
+    store.set({ status: "ready", snapshot });
+    announce(`已切换到 ${next.label}，数据窗口 ${next.window}`);
+  }).catch((error) => {
+    store.set({ status: "error", error: error.message || String(error) });
+  });
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
@@ -364,14 +391,14 @@ function bindOnce() {
   });
 }
 
-function readSavedPeriod(catalog) {
+function readSavedPeriod(manifest) {
   let saved = null;
   try {
     saved = localStorage.getItem(STORAGE.period);
   } catch {
     /* 忽略 */
   }
-  return catalog.periods.some((p) => p.id === saved) ? saved : catalog.defaultId;
+  return manifest.periods.some((p) => p.id === saved) ? saved : manifest.defaultPeriodId;
 }
 
 async function boot() {
@@ -379,15 +406,18 @@ async function boot() {
   startClock();
 
   try {
-    const catalog = await loadCatalog(CATALOG_URL);
-    store.set({ catalog, periodId: readSavedPeriod(catalog), status: "ready" });
+    const manifest = await loadManifest(MANIFEST_URL);
+    const periodId = readSavedPeriod(manifest);
+    const snapshot = await loadSnapshot(manifest, periodId);
+    store.set({ manifest, snapshot, periodId, status: "ready" });
   } catch (error) {
     const message =
-      error instanceof CatalogError
+      error instanceof DashboardDataError
         ? error.message
         : `发生未预期错误：${error && error.message ? error.message : error}`;
     store.set({ status: "error", error: message });
   }
 }
 
+subscribeRoute((route, query) => store.set({ route, query }));
 boot();

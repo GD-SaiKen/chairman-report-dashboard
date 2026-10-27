@@ -218,6 +218,43 @@ gh repo deploy-key add $env:USERPROFILE\.ssh\id_ed25519_chairman_report.pub `
 
 # 或运行项目内脚本（无 gh 时会打印公钥与网页入口）
 .\scripts\register-github-deploy-key.ps1
+
+## 七、公司级 AI 运转驾驶舱（第一阶段）
+
+当前入口已升级为六个专题：公司总览、部门 AI 采用、AI 需求机会、Skills & Agents、Token 效率、AI 前沿雷达。数据由 `data/manifest.json` 按期次加载，专题快照位于 `data/snapshots/{period}/`；旧 `data/catalog.json` 与 `reports/` 保留用于历史全文回溯。
+
+### 本地生成与校验
+
+```powershell
+npm test
+npm run snapshot:validate -- --period 2026-10-12
+npm run snapshot:build -- --period 2026-10-12 --input .local-data/2026-10-12
+npm start
+```
+
+原始标准化输入只放在 `.local-data/` 或 `data/inbox/`，不要提交仓库。快照中缺失数字保持 `—`，由质量报告标记为 `warning` / `missing`，不得静默补零。Token 的有效业务消耗、缓存读取、非业务消耗和 aikey 对账口径分开计算，避免重复相加。
+
+### 雷达采集
+
+```powershell
+$env:GITHUB_TOKEN = "<只在当前终端设置>"
+npm run radar:collect -- --period 2026-10-12 --output .local-data/2026-10-12/radar-candidates.json
+```
+
+采集结果默认是未审核候选，不会自动进入正式 `radar.json`；信息部需补充公司适用性、风险和“关注 / 安排试用 / 建议引入 / 暂不采用”结论后再发布。
+
+### 共享口令门禁
+
+生产环境使用 `deploy/nginx/ai-cockpit.conf.example`，在站点根路径启用 Nginx Basic Auth。`.htpasswd`、明文口令、API Token 和 `.env` 均不得提交。发布前检查页面与快照 JSON 均返回 `401`，认证后返回 `200`：
+
+```powershell
+curl.exe -I https://<dashboard-host>/index.html
+curl.exe -I https://<dashboard-host>/data/manifest.json
+curl.exe -I -u cockpit https://<dashboard-host>/index.html
+curl.exe -I -u cockpit https://<dashboard-host>/data/manifest.json
+```
+
+上线前还应运行 `rg -n -i "password|secret|api[_-]?key|token" . -g "!reports/**"`，逐项确认命中仅为字段名、文档或环境变量说明。
 ```
 
 本地仓库远程（已 `git init` 时可核对）：

@@ -6,7 +6,12 @@
   "description": "信息部与 Hermes 项目报告的一屏判断面板（零依赖静态站点）",
   "scripts": {
     "start": "node server.mjs",
-    "dev": "node server.mjs"
+    "dev": "node server.mjs",
+    "test": "node --test",
+    "check": "node --test && node --check js/app.js",
+    "snapshot:build": "node scripts/build-snapshot.mjs",
+    "snapshot:validate": "node scripts/validate-snapshot.mjs",
+    "radar:collect": "node scripts/collect-radar.mjs"
   },
   "engines": {
     "node": ">=18"

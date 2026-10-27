@@ -1,4 +1,8 @@
 .workbuddy/
 .cursor/
+.local-data/
+data/inbox/
+.env
+.env.*
 .DS_Store
 Thumbs.db

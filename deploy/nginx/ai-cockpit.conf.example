@@ -1,0 +1,14 @@
+server {
+    listen 443 ssl;
+    server_name ai-cockpit.example.com;
+
+    root /srv/company-ai-cockpit;
+    index index.html;
+
+    # 页面、快照 JSON、报告全文统一受同一层门禁保护。
+    location / {
+        auth_basic "Company AI Cockpit";
+        auth_basic_user_file /etc/nginx/secrets/ai-cockpit.htpasswd;
+        try_files $uri $uri/ /index.html;
+    }
+}
