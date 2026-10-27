@@ -13,6 +13,8 @@ export const TOKEN_CLASSES = ["business", "test", "system"];
 export const QUALITY_STATES = ["ok", "warning", "stale", "missing"];
 export const RADAR_TYPES = ["ai-tool", "agent-tool", "topic"];
 export const RADAR_DECISIONS = ["watch", "trial", "adopt", "reject"];
+export const REVIEW_STATES = ["pending", "accepted", "edited", "rejected"];
+export const ISSUE_SEVERITIES = ["info", "warning", "blocking"];
 
 const RESULT = (errors = []) => ({ ok: errors.length === 0, errors });
 const required = (value, name, errors) => {
@@ -111,5 +113,15 @@ export function validateCollection(items, validator, name) {
     const result = validator(item);
     errors.push(...result.errors.map((error) => `${name}[${index}]: ${error}`));
   });
+  return RESULT(errors);
+}
+
+export function validateImportDraft(raw) {
+  const errors = [];
+  if (!raw?.period?.id && !raw?.curation) errors.push("draft.period.id is required");
+  if (!Array.isArray(raw?.files)) errors.push("draft.files must be an array");
+  if (!raw?.candidates || typeof raw.candidates !== "object") errors.push("draft.candidates must be an object");
+  if (!Array.isArray(raw?.quality?.issues)) errors.push("draft.quality.issues must be an array");
+  if (!Array.isArray(raw?.revisions)) errors.push("draft.revisions must be an array");
   return RESULT(errors);
 }
