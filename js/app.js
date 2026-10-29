@@ -9,7 +9,7 @@
 import { createStore } from "./core/store.js";
 import { loadManifest, loadSnapshot, selectPeriod, DashboardDataError } from "./core/dashboard-data.js";
 import { parseRoute, routeQuery, subscribeRoute } from "./core/router.js";
-import { qs, mount, icon, isCompact } from "./core/dom.js";
+import { h, qs, mount, icon, isCompact } from "./core/dom.js";
 import { renderBrand, renderNav, renderSidebarFoot, selectField } from "./ui/shell.js";
 import { renderOverview } from "./ui/overview.js";
 import { renderDepartments } from "./ui/departments.js";
@@ -23,7 +23,6 @@ import { qualityBadge } from "./ui/shared.js";
 
 const MANIFEST_URL = "data/manifest.json";
 const STORAGE = { theme: "crd:theme", period: "crd:period" };
-const SECTION_IDS = ["overview", "departments", "demands", "capabilities", "tokens", "radar"];
 const MOBILE_BREAKPOINT = "(max-width: 960px)";
 
 /* ------------------------------ DOM 引用 ------------------------------ */
@@ -65,6 +64,7 @@ let revealObserver = null;
 let clockTimer = null;
 let scrollTick = 0;
 let drawerOpen = false;
+let snapshotRequest = 0;
 
 /* ============================ 渲染 ============================ */
 
@@ -127,23 +127,21 @@ function renderRoute(route, snapshot, query) {
 }
 
 function loadingView() {
-  const el = document.createElement("section");
-  el.className = "dash-empty dashboard-page";
-  el.innerHTML = "<strong>正在加载公司 AI 运转快照…</strong><span>正在读取期次清单与专题数据</span>";
-  return el;
+  return h("section", { class: "dash-empty dashboard-page" },
+    h("strong", { text: "正在加载公司 AI 运转快照…" }),
+    h("span", { text: "正在读取期次清单与专题数据" }));
 }
 
 function errorView(message) {
-  const el = document.createElement("section");
-  el.className = "dash-empty dashboard-page";
-  el.innerHTML = `<strong>数据加载失败</strong><span>${String(message || "未知错误")}</span>`;
-  return el;
+  // 错误信息一律走 textContent：里头可能含有来自数据文件的路径与文案
+  return h("section", { class: "dash-empty dashboard-page" },
+    h("strong", { text: "数据加载失败" }),
+    h("span", { text: String(message || "未知错误") }));
 }
 
-/** 每次重渲染后重建所有观察器与定时器（先销毁，后创建） */
+/** 每次重渲染后重建观察器（先销毁，后创建） */
 function afterRender() {
   observeReveal();
-  updateScrollSpy();
   updateTopbarShadow();
   applyInert();
 }
@@ -167,38 +165,12 @@ function observeReveal() {
   document.querySelectorAll(".reveal").forEach((el) => revealObserver.observe(el));
 }
 
-/** 滚动监听：高亮侧栏当前区块 + 顶栏投影 */
+/** 滚动监听：顶栏投影 */
 function onScroll() {
   if (scrollTick) return;
   scrollTick = requestAnimationFrame(() => {
     scrollTick = 0;
-    updateScrollSpy();
     updateTopbarShadow();
-  });
-}
-
-function updateScrollSpy() {
-  // 锚定「视口顶部往下一小段」而不是 30% 视口高：
-  // 后者在超长视口（如截图、超宽屏）下会把整页都判为已进入
-  const threshold = window.scrollY + Math.min(window.innerHeight * 0.35, 180);
-  let active = SECTION_IDS[0];
-
-  for (const id of SECTION_IDS) {
-    const el = document.getElementById(id);
-    if (el && el.getBoundingClientRect().top + window.scrollY <= threshold) active = id;
-  }
-
-  // 滚到底时强制定位到最后一节，避免短尾节永远无法激活
-  const atBottom =
-    window.innerHeight + window.scrollY >=
-    (document.body.scrollHeight || document.documentElement.scrollHeight) - 4;
-  if (atBottom) active = SECTION_IDS[SECTION_IDS.length - 1];
-
-  document.querySelectorAll('[data-nav="section"]').forEach((link) => {
-    const isActive = link.getAttribute("href") === `#${active}`;
-    link.classList.toggle("is-active", isActive);
-    if (isActive) link.setAttribute("aria-current", "location");
-    else link.removeAttribute("aria-current");
   });
 }
 
@@ -274,11 +246,15 @@ function onPeriodChange(event) {
     /* 忽略写入失败 */
   }
 
+  const requestId = ++snapshotRequest;
   store.set({ status: "loading", periodId: nextId });
   loadSnapshot(manifest, nextId).then((snapshot) => {
+    // 丢弃过期响应：快速连切两次时，先发的慢请求不能覆盖用户最后选的期次
+    if (requestId !== snapshotRequest) return;
     store.set({ status: "ready", snapshot });
     announce(`已切换到 ${next.label}，数据窗口 ${next.window}`);
   }).catch((error) => {
+    if (requestId !== snapshotRequest) return;
     store.set({ status: "error", error: error.message || String(error) });
   });
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -370,7 +346,6 @@ function bindOnce() {
   window.addEventListener("resize", () => {
     if (!isCompact() && drawerOpen) closeDrawer({ restoreFocus: false });
     applyInert();
-    updateScrollSpy();
   });
 
   // 窄屏用 JS 收起抽屉，宽屏恢复常驻
@@ -408,7 +383,9 @@ async function boot() {
   try {
     const manifest = await loadManifest(MANIFEST_URL);
     const periodId = readSavedPeriod(manifest);
+    const requestId = ++snapshotRequest;
     const snapshot = await loadSnapshot(manifest, periodId);
+    if (requestId !== snapshotRequest) return;
     store.set({ manifest, snapshot, periodId, status: "ready" });
   } catch (error) {
     const message =

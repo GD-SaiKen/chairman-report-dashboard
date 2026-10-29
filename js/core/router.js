@@ -5,8 +5,13 @@ export function parseRoute(hash = "") {
   return ROUTES.includes(route) ? route : "overview";
 }
 
-export function routeHref(route) {
-  return `#${ROUTES.includes(route) ? route : "overview"}`;
+/** 生成路由链接；带 query 时用于部门下钻这类需要参数的入口 */
+export function routeHref(route, query = {}) {
+  const target = ROUTES.includes(route) ? route : "overview";
+  const search = new URLSearchParams(
+    Object.entries(query).filter(([, value]) => value != null && value !== ""),
+  ).toString();
+  return `#${target}${search ? `?${search}` : ""}`;
 }
 
 export function routeQuery(hash = "") {

@@ -1,10 +1,12 @@
 import * as nodeFs from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { HttpError } from "./http.mjs";
 
 const PERIOD_ID = /^\d{4}-\d{2}-\d{2}$/;
 
 export function assertPeriodId(periodId) {
-  if (!PERIOD_ID.test(periodId || "")) throw new Error("invalid period id");
+  // 非法期次 id 是客户端错误，不该报成 500
+  if (!PERIOD_ID.test(periodId || "")) throw new HttpError(400, "INVALID_PERIOD_ID", "期次 ID 必须是 YYYY-MM-DD 格式");
   return periodId;
 }
 
@@ -20,10 +22,38 @@ async function writeJsonAtomic(fs, path, value) {
   await fs.rename(temp, path);
 }
 
+/**
+ * 按 key 串行的乐观锁。
+ * 文件存储的读—改—写天然有竞态：两个并发上传或发布会互相覆盖，
+ * 这里不需要引入锁服务，按 key 排队就足以保证同一期次的操作互斥。
+ */
+const locks = new Map();
+
+async function withLock(key, task) {
+  const previous = locks.get(key) || Promise.resolve();
+  let release;
+  const gate = new Promise((done) => { release = done; });
+  const chained = previous.then(() => gate);
+  locks.set(key, chained);
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+    // 只有链条上最后一个任务才回收条目，避免 Map 无限增长
+    if (locks.get(key) === chained) locks.delete(key);
+  }
+}
+
 export class FileImportStore {
   constructor(storageRoot, { fs = nodeFs } = {}) {
     this.root = resolve(storageRoot);
     this.fs = fs;
+  }
+
+  /** 串行执行同一期次的读—改—写，避免并发互相覆盖 */
+  transaction(periodId, task) {
+    return withLock(`period:${assertPeriodId(periodId)}`, task);
   }
 
   draftDir(periodId) {

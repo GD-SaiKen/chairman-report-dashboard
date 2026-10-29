@@ -30,11 +30,20 @@ export async function loadSnapshot(manifest, periodId) {
   }));
   const snapshot = { period, ...Object.fromEntries(entries) };
   const errors = [];
+
+  // 文件加载失败必须可见：否则页面会在「数据正常」的标记下渲染出空专题，
+  // 用户无法区分「本期确实没有数据」与「文件没取到」
+  const missing = entries.filter(([, value]) => value?.qualityStatus === "missing").map(([key]) => key);
+  if (missing.length) errors.push(`专题数据加载失败：${missing.join("、")}`);
+
   if (snapshot.departments?.departments) errors.push(...validateCollection(snapshot.departments.departments, validateDepartment, "departments").errors);
   if (snapshot.demands?.demands) errors.push(...validateCollection(snapshot.demands.demands, validateDemand, "demands").errors);
   if (snapshot.capabilities?.capabilities) errors.push(...validateCollection(snapshot.capabilities.capabilities, validateCapability, "capabilities").errors);
   if (snapshot.tokens?.records) errors.push(...validateCollection(snapshot.tokens.records, validateTokenRecord, "tokens.records").errors);
   if (snapshot.radar?.items) errors.push(...snapshot.radar.items.flatMap((item, index) => validateRadarItem(item).errors.map((error) => `radar[${index}]: ${error}`)));
-  if (errors.length) snapshot.quality = { ...(snapshot.quality || {}), status: "warning", warnings: [...(snapshot.quality?.warnings || []), ...errors] };
+
+  const qualityMissing = !snapshot.quality || Boolean(snapshot.quality.qualityStatus);
+  const base = qualityMissing ? { status: "missing", warnings: [] } : snapshot.quality;
+  snapshot.quality = { ...base, ...(errors.length ? { status: "warning", warnings: [...(base.warnings || []), ...errors] } : {}) };
   return snapshot;
 }

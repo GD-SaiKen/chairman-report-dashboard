@@ -1,7 +1,9 @@
+import { h } from "../../js/core/dom.js";
+
 export const STEP_DEFS = [
   ["period", "创建期次", ["uploaded"]], ["upload", "上传报告", ["uploaded", "failed"]],
   ["extract", "解析进度", ["sanitizing", "extracting", "validating"]],
-  ["review", "提取审核", ["review_required"]], ["publish", "发布确认", ["approved", "publishing", "published"]],
+  ["review", "提取审核", ["review_required", "failed"]], ["publish", "发布确认", ["approved", "publishing", "published"]],
 ];
 
 export function buildSteps(period = {}) {
@@ -17,11 +19,39 @@ export function groupCandidates(draft = {}) {
   return Object.fromEntries(["departments", "people", "demands", "capabilities", "tokens", "radar"].map((key) => [key, input[key] || []]));
 }
 
+/**
+ * 全部走 DOM 构造：候选名与问题文案都可能来自上传的 HTML，
+ * 用 innerHTML 插值会变成存储型 XSS。
+ */
 export function renderWorkbench(root, state) {
   const period = state.period || {};
   const groups = groupCandidates(state.draft);
-  root.querySelector("#steps").innerHTML = buildSteps(period).map((step) => `<li class="step ${step.current ? "is-current" : ""}" ${step.current ? 'aria-current="step"' : ""}>${step.label}</li>`).join("");
+
+  root.querySelector("#steps").replaceChildren(...buildSteps(period).map((step) =>
+    h("li", { class: `step ${step.current ? "is-current" : ""}`, ...(step.current ? { "aria-current": "step" } : {}) }, step.label)
+  ));
+
   root.querySelector("#status").textContent = period.status ? `当前状态：${period.status}` : "尚未创建期次";
-  root.querySelector("#candidate-summary").innerHTML = Object.entries(groups).map(([key, items]) => `<article><strong>${key}</strong><span>${items.length}</span></article>`).join("");
-  root.querySelector("#issues").innerHTML = (state.quality?.issues || []).map((issue) => `<li><strong>${issue.code}</strong> ${issue.message}</li>`).join("") || "<li>暂无质量问题</li>";
+
+  root.querySelector("#candidate-summary").replaceChildren(...Object.entries(groups).map(([key, items]) =>
+    h("article", null, h("strong", { text: key }), h("span", { text: String((items || []).length) }))
+  ));
+
+  const issues = state.quality?.issues || [];
+  root.querySelector("#issues").replaceChildren(...(issues.length
+    ? issues.map((issue) => h("li", null, h("strong", { text: issue.code || "问题" }), ` ${issue.message || ""}`))
+    : [h("li", { text: "暂无质量问题" })]));
+}
+
+/** 把操作失败显示在页面上，替代原先被吞掉的未处理 Promise 拒绝 */
+export function renderError(root, message) {
+  const host = root.querySelector("#error");
+  if (!host) return;
+  if (!message) {
+    host.hidden = true;
+    host.textContent = "";
+    return;
+  }
+  host.hidden = false;
+  host.textContent = message;
 }

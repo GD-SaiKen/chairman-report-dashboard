@@ -6,8 +6,12 @@ import { FileImportStore } from "./import/store.mjs";
 import { serveStaticFile } from "./static-files.mjs";
 
 export function createRequestHandler(options = {}) {
-  const config = createImportConfig(options);
-  const routes = createImportRoutes({ store: options.store || new FileImportStore(config.storageRoot), config });
+  const config = options.config || createImportConfig(options);
+  const routes = createImportRoutes({
+    store: options.store || new FileImportStore(config.storageRoot),
+    config,
+    services: options.services,
+  });
   return async (req, res) => {
     try {
       const url = new URL(req.url || "/", "http://localhost");
@@ -25,5 +29,9 @@ export function createRequestHandler(options = {}) {
 }
 
 export function createApp(options = {}) {
-  return createServer(createRequestHandler(options));
+  const config = options.config || createImportConfig(options);
+  const server = createServer(createRequestHandler({ ...options, config, services: options.services }));
+  // 暴露出来以便启动时提示配置缺失，避免「点了没反应」这类无法诊断的 403
+  server.importConfig = config;
+  return server;
 }

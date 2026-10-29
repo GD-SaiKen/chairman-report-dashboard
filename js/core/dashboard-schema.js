@@ -15,6 +15,8 @@ export const RADAR_TYPES = ["ai-tool", "agent-tool", "topic"];
 export const RADAR_DECISIONS = ["watch", "trial", "adopt", "reject"];
 export const REVIEW_STATES = ["pending", "accepted", "edited", "rejected"];
 export const ISSUE_SEVERITIES = ["info", "warning", "blocking"];
+/** 七个快照文件的键；与 snapshot-contract.js 的 SNAPSHOT_FILES 保持一致 */
+export const SNAPSHOT_FILE_KEYS = ["overview", "departments", "demands", "capabilities", "tokens", "radar", "quality"];
 
 const RESULT = (errors = []) => ({ ok: errors.length === 0, errors });
 const required = (value, name, errors) => {
@@ -39,12 +41,14 @@ export function validateManifest(raw) {
     required(period.window, "period.window", errors);
     required(period.asOf, "period.asOf", errors);
     const files = period.files || {};
-    for (const route of ROUTES.filter((route) => route !== "overview" || true)) {
-      if (!files[route] && route !== "overview") errors.push(`period.files.${route} is required`);
-    }
-    for (const file of ["overview", "departments", "demands", "capabilities", "tokens", "radar", "quality"]) {
+    for (const file of SNAPSHOT_FILE_KEYS) {
       if (!files[file]) errors.push(`period.files.${file} is required`);
     }
+  }
+  // 默认期次必须真实登记过，否则首屏会渲染成空白
+  const ids = (raw.periods || []).map((period) => period.id);
+  if (raw.defaultPeriodId && !ids.includes(raw.defaultPeriodId)) {
+    errors.push(`defaultPeriodId ${raw.defaultPeriodId} is not a registered period`);
   }
   return RESULT(errors);
 }
@@ -56,7 +60,9 @@ export function validateDepartment(raw) {
   required(raw.id, "department.id", errors);
   required(raw.name, "department.name", errors);
   for (const field of ["activeUsers", "newUsers", "repeatUsers", "validDemands"]) {
-    if (raw[field] != null && (!Number.isFinite(raw[field]) || raw[field] < 0)) errors.push(`${field} must be a non-negative number or null`);
+    // undefined 表示上游根本没给值，与显式的 null（未知）不是一回事，必须报出来
+    if (!(field in raw)) errors.push(`${field} must be present (use null when unknown)`);
+    else if (raw[field] != null && (!Number.isFinite(raw[field]) || raw[field] < 0)) errors.push(`${field} must be a non-negative number or null`);
   }
   return RESULT(errors);
 }

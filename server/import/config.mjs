@@ -9,5 +9,7 @@ export function createImportConfig(overrides = {}) {
     maxFileBytes: Number(process.env.IMPORT_MAX_FILE_BYTES || 10 * 1024 * 1024),
     maxPeriodBytes: Number(process.env.IMPORT_MAX_PERIOD_BYTES || 40 * 1024 * 1024),
     allowedOrigin: overrides.allowedOrigin || process.env.AI_COCKPIT_ORIGIN || "",
+    // 未配置来源时写操作会被安全策略全数拒绝，需要一个可判断的标记
+    originConfigured: Boolean(overrides.allowedOrigin || process.env.AI_COCKPIT_ORIGIN),
   };
 }

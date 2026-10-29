@@ -12,7 +12,7 @@
 | 配色 | 颜色即语义，绝不用于装饰 | 主色 `#3B6FE0` 仅用于品牌与主操作；红 `#C23B33` 只给红灯与「待建」，黄 `#D9822B` 给黄灯与「待签署 / 待演示」，其余状态一律浅蓝 |
 | 排版 | 让管理层 3 秒读到结论 | 结论条（Hero）→ 仪表带（6 个数字）→ 三块区（判断/风险/待决策）→ 两扇门（报告入口），信息密度自上而下递减 |
 | 动效 | 帮助理解层级，绝不制造等待 | 数字滚动（缓出 720ms）、区块入场位移 10px + 错峰 55ms、hover 抬升 2px；全部在系统「减弱动态效果」下自动关闭 |
-| 交互 | 少而准 | 期次切换、锚点跳转（滚动高亮侧栏）、报告全文、深浅色切换；不引入登录 / 搜索 / 通知这类空壳功能 |
+| 交互 | 少而准 | 期次切换、专题路由、部门下钻、报告全文、深浅色切换；不引入登录 / 搜索 / 通知这类空壳功能 |
 
 **可访问性底线**：正文只有两种字色（`--ink-900` / `--ink-600`），均 ≥ 4.5:1；`--ink-400` 只允许承载图标与分隔线。红灯/黄灯同时输出「红灯 / 黄灯」文字，不靠颜色单独传达信息。
 
@@ -25,15 +25,17 @@
 | 框架 | **无框架**（原生 ES Module） | 页面本质是「取一份 JSON → 渲染 20 个节点」。引入 React/Vue 会带来构建产物，破坏与本项目两份报告 HTML 同源部署、CloudStudio 直接托管静态目录的现状；`js/core/dom.js` 里 40 行的 `h()` 已覆盖全部渲染需求，且文本走 `textContent`，天然免疫 XSS |
 | 状态管理 | **40 行发布订阅 store** | 全局状态只有三项：目录数据、当前期次、主题。一次 `set` → 全量重渲染的单向数据流最易读，也免去 diff 带来的心智负担 |
 | 样式 | **CSS 自定义属性 + BEM** | 设计令牌全部集中在 `css/tokens.css`，组件样式零硬编码；换肤只需覆写变量（暗色主题正是这么实现的，组件选择器一行没改） |
-| 数据 | `data/catalog.json` 单一数据源 | 保留既有约定。`core/catalog.js` 负责校验与归一化，缺字段自动补默认值，将来换成后端接口只需替换 `loadCatalog()` |
-| 构建 | **零依赖、零构建** | `package.json` 无 `dependencies`，`npm start` 走 Node 内置模块起的静态服务，`git clone` 后 5 秒可跑 |
+| 数据 | `data/manifest.json` 期次清单 + `data/snapshots/{period}/` 专题快照 | 七个快照文件的结构由 `js/core/snapshot-contract.js` 单点定义，`snapshot:build` 与导入发布两端共用同一契约，产出必然一致 |
+| 构建 | **零构建** | 驾驶舱本身零第三方依赖，`npm start` 起 Node 内置静态服务即可查看；仅 HTML 导入管理台用到 `busboy` 与 `parse5`，不导入报告时无需安装 |
 
 ---
 
 ## 三、启动步骤
 
 ```bash
-# 依赖：Node.js ≥ 18（无需 npm install，项目无第三方依赖）
+# 依赖：Node.js ≥ 18
+# 只看驾驶舱无需任何依赖；使用 HTML 导入管理台才需要安装下列两个依赖
+npm install            # 仅 busboy + parse5
 npm start              # → http://localhost:5175
 
 PORT=6000 npm start    # 换端口
@@ -61,17 +63,24 @@ chairman-report-dashboard/
 │  └─ report-return.css  # 全文页左上角「首页」悬浮入口
 ├─ js/
 │  ├─ core/
-│  │  ├─ dom.js          # h() / icon() / mount() / countUp() 等无依赖工具
-│  │  ├─ store.js        # 极简发布订阅状态容器
-│  │  └─ catalog.js      # 取数 → 校验 → 归一化 → 派生指标（不碰 DOM）
-│  ├─ ui/views.js        # 纯渲染函数：传入数据，返回 DOM 节点
-│  └─ app.js             # 装配层：唯一持有状态与副作用的文件
-├─ server.mjs            # 零依赖本地静态服务
-├─ data/catalog.json     # 唯一数据源（未改动）
-└─ reports/…             # 报告全文；入口页引用 report-return.css
+│  │  ├─ dom.js               # h() / icon() / mount() / countUp() 等无依赖工具
+│  │  ├─ store.js             # 极简发布订阅状态容器
+│  │  ├─ dashboard-schema.js  # 数据契约校验（前端 / 脚本 / 服务端共用）
+│  │  ├─ metrics.js           # 派生指标：采用、需求漏斗、能力、Token
+│  │  ├─ snapshot-contract.js # 七个快照文件的唯一产出契约（两端共用）
+│  │  └─ dashboard-data.js    # 取数 → 契约校验 → 缺文件时标记质量状态
+│  ├─ ui/                     # 六个专题的纯渲染函数：传入数据，返回 DOM 节点
+│  └─ app.js                  # 装配层：唯一持有状态与副作用的文件
+├─ server/                    # 内置静态服务 + HTML 导入接口
+├─ manage/import/             # 导入管理工作台（不出现在普通导航中）
+├─ data/
+│  ├─ manifest.json           # 期次清单
+│  ├─ snapshots/{period}/     # 七个专题快照文件
+│  └─ curation/{period}.json  # 人工策展（可选增强项）
+└─ reports/…                  # 报告全文；入口页引用 report-return.css
 ```
 
-**分层约束**：`views.js` 与 `core/catalog.js` 都不接触 DOM，可单独单元测试；所有事件监听、观察器、定时器集中在 `app.js`，保证重渲染时先销毁再重建。
+**分层约束**：`ui/*` 与 `core/*` 都不接触 DOM，可单独单元测试（渲染测试用 `tests/helpers/dom-stub.mjs` 提供极简 DOM 桩）；所有事件监听、观察器、定时器集中在 `app.js`，保证重渲染时先销毁再重建。
 
 ---
 
@@ -96,22 +105,22 @@ chairman-report-dashboard/
 ### 3. 复用组件
 
 ```js
-import { renderMeters, renderRisks } from "./ui/views.js";
-document.querySelector("#slot").append(renderRisks(period));
+import { renderOverview } from "./ui/overview.js";
+document.querySelector("#slot").append(renderOverview(snapshot, {}));
 ```
 
-所有 `render*` 都是纯函数，可任意组合进别的容器。需要新面板时，在 `views.js` 里复用私有的 `section()` / `panel()` 骨架即可保持视觉一致。
+所有 `render*` 都是纯函数，可任意组合进别的容器。需要新面板时，在 `js/ui/shared.js` 里复用 `section()` / `panel()` 骨架即可保持视觉一致；`section()` 会用 `slugifyId()` 生成无空格的 id，保证 `aria-labelledby` 能被读屏正确解析。
 
 ### 4. 新增数据源 / 期次
 
-- **新来源标签**：在 `core/catalog.js` 的 `SOURCE_META` 登记 `{ label, icon, tone }`，并在 `index.html` 的 sprite 中补上同名 symbol。
+- **新来源标签**：在 `js/core/dashboard-schema.js` 的 `RADAR_TYPES` / `DECISION_TONE` 登记，并在 `index.html` 的 sprite 中补上同名 symbol。
 - **新状态语义**：`DECISION_TONE` 负责 `tone → 徽标样式` 映射，新增一种紧急度只需在此加一行。
 
 ---
 
 ## 六、报告接入（无后台上传）
 
-站点是静态目录：**新一期 = 拷贝报告全文到 `reports/` + 在 `data/catalog.json` 登记**。侧栏、期次下拉、报告入口均从 JSON 动态生成，无需改站点代码。
+站点是静态目录：**新一期 = 拷贝报告全文到 `reports/` + 在 `data/manifest.json` 登记 + 在 `data/snapshots/{period}/` 放好七个快照文件**；快照可由 `npm run snapshot:build` 生成，也可由管理台导入发布产生。侧栏、期次下拉、报告入口均从 JSON 动态生成，无需改站点代码。
 
 ### 6.1 放置全文
 
@@ -149,21 +158,43 @@ reports/{YYYY-MM-DD}_{YYYY-MM-DD}/
 - 报告自带的 css/图片放在同一子目录，用相对路径引用；不要改站点的 `css/`、`js/`（`report-return.css` 除外，由全文页引用）。
 - `onlineUrl` 可选：有 WorkBuddy 等线上原件就填，没有可只保留 `localPath`。
 
-### 6.2 登记 catalog.json
+### 6.2 登记 manifest.json
 
 在 `periods` **数组最前面**追加一期（新期在上），并把 `defaultPeriodId` 改为新期的 `id`。
+
+```json
+{
+  "site": { "title": "信息部与 Hermes 项目报告", "subtitle": "一屏判断面板" },
+  "defaultPeriodId": "2026-10-13",
+  "periods": [
+    {
+      "id": "2026-10-13",
+      "label": "2026-10-13 期",
+      "window": "2026-10-13 ~ 10-27",
+      "asOf": "2026-10-27T18:00:00+08:00",
+      "files": {
+        "overview": "data/snapshots/2026-10-13/overview.json",
+        "departments": "data/snapshots/2026-10-13/departments.json",
+        "demands": "data/snapshots/2026-10-13/demands.json",
+        "capabilities": "data/snapshots/2026-10-13/capabilities.json",
+        "tokens": "data/snapshots/2026-10-13/tokens.json",
+        "radar": "data/snapshots/2026-10-13/radar.json",
+        "quality": "data/snapshots/2026-10-13/quality.json"
+      }
+    }
+  ]
+}
+```
 
 字段约定：
 
 | 字段 | 说明 |
 | --- | --- |
-| `id` | 建议用窗口起始日 `YYYY-MM-DD`，供下拉与 localStorage |
-| `label` / `window` / `updated` | 期次名、数据窗口、更新日期 |
-| `meters` | 4–6 个指标；`source` 仅 `info` / `sino` / `deck`，**禁止跨报告加总** |
-| `judgments` | 3–5 条短句，须能在原文中找到出处 |
-| `risks` | `level` 仅 `red` 或 `amber` |
-| `decisions` | `tone` 仅 `urgent` / `wait` / `watch` |
-| `reports[]` | `localPath` 为相对站点根的路径；`onlineUrl` 可选 |
+| `id` | 窗口起始日 `YYYY-MM-DD`，供下拉与 localStorage；只能是该格式，否则接口返回 400 |
+| `label` / `window` / `asOf` | 期次名、数据窗口、数据截止时间 |
+| `files` | 七个专题快照的相对站点根路径，**七个键缺一不可**，否则 `validateManifest` 直接报错 |
+
+报告全文入口来自 `overview.json` 的 `report` 字段（`title` / `window` / `localPath` / `onlineUrl`），制造类红线与风险等判断同样取自专题快照，不再另设入口清单。
 
 可复制模板（按需改文案与路径）：
 
@@ -221,7 +252,9 @@ gh repo deploy-key add $env:USERPROFILE\.ssh\id_ed25519_chairman_report.pub `
 
 ## 七、公司级 AI 运转驾驶舱（第一阶段）
 
-当前入口已升级为六个专题：公司总览、部门 AI 采用、AI 需求机会、Skills & Agents、Token 效率、AI 前沿雷达。数据由 `data/manifest.json` 按期次加载，专题快照位于 `data/snapshots/{period}/`；旧 `data/catalog.json` 与 `reports/` 保留用于历史全文回溯。
+当前入口已升级为六个专题：公司总览、部门 AI 采用、AI 需求机会、Skills & Agents、Token 效率、AI 前沿雷达。数据由 `data/manifest.json` 按期次加载，专题快照位于 `data/snapshots/{period}/`；`reports/` 保留用于历史全文回溯。
+
+七个快照文件的结构由 `js/core/snapshot-contract.js` 单点定义：`snapshot:build` 与导入发布两端都只负责归一化输入，产出必然一致。契约的硬规矩是**缺失一律 `null`，绝不补 0**——原始消息数（去重前）这类无法从条目推导的指标留空，页面显示「—」并由质量报告标记，避免管理层把「没数据」读成「真的是 0」。
 
 ### 本地生成与校验
 
@@ -271,6 +304,18 @@ ssh -T git@github.com-chairman-report
 管理工作台位于 `/manage/import/`，不出现在普通导航中。该路径只是降低误触，页面和 `/api/import/` 必须与驾驶舱共用 Nginx Basic Auth。
 
 操作流程：创建期次、上传多份 UTF-8 HTML、开始解析、处理阻断问题、填写审核人、确认发布。未配置 AI Provider 时系统保留规则提取结果并提示人工补齐，不会因缺少模型而丢失上传文件。
+
+解析结果与 AI 结果会合并进候选集：需求、能力、Token 明细与雷达全部进入草稿，供信息部在工作台逐项审核；雷达候选默认「待审核」，未经审核不会进入正式快照。
+
+**本地同样必须配置 `AI_COCKPIT_ORIGIN`**：来源校验是 fail-closed 的，未配置时工作台的所有写操作都会被拒绝，且页面会明确提示原因；若不设置，点击按钮只会看到红色的失败提示而没有其他线索。
+
+```bash
+# 本地（Windows PowerShell）
+$env:AI_COCKPIT_ORIGIN = "http://localhost:5175"
+npm start
+```
+
+发布或解析失败后，期次会退回「已审核 / 失败」状态而不是卡在处理中，草稿未变，修复原因后可直接重试；重复发布会被并发控制挡下并返回 409。
 
 生产环境变量：
 

@@ -87,7 +87,12 @@ export function summarizeTokens(records = []) {
     const total = (record.input || 0) + (record.output || 0);
     const source = result.sourceBreakdown[record.source] ||= { effective: 0, cacheRead: 0, nonBusiness: 0 };
     if (record.reconciliationOnly) {
-      result.reconciliationOnly += total;
+      // 网关对账口径单独计量：有 reconciliationTotal 时用它，否则退回 input+output
+      // 注意：Number(null) 为 0，必须先判空，否则未填 reconciliationTotal 时会被算成 0
+      result.reconciliationOnly +=
+        record.reconciliationTotal != null && Number.isFinite(Number(record.reconciliationTotal))
+          ? Number(record.reconciliationTotal)
+          : total;
       continue;
     }
     result.cacheRead += record.cacheRead || 0;
