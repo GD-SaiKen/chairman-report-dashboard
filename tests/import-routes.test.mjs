@@ -159,3 +159,18 @@ test("malformed period ids are reported as client errors", async () => {
     await env.cleanup();
   }
 });
+
+test("creating a period without asOf fails immediately with 422 instead of at publish time", async () => {
+  const env = await makeEnv();
+  try {
+    const result = await request(env.routes, {
+      method: "POST", path: "/api/import/periods", headers: CSRF,
+      body: JSON.stringify({ id: "2026-12-01", label: "缺截至时间", window: "2026-12-01 ~ 12-07" }),
+    });
+    assert.equal(result.status, 422);
+    assert.equal(result.code, "ASOF_REQUIRED");
+    assert.equal(await env.store.getPeriod("2026-12-01"), null);
+  } finally {
+    await env.cleanup();
+  }
+});

@@ -42,7 +42,12 @@ export function createImportRoutes({ store, config, services = {} }) {
     }
     if (req.method === "POST" && url.pathname === "/api/import/periods") {
       secure(req, config);
-      json(res, 201, await store.createPeriod(await readJsonBody(req)));
+      const body = await readJsonBody(req);
+      // 截至时间是快照 manifest 的必填字段：创建时就拦下，否则用户走完上传解析审核才在发布时失败
+      if (!String(body.asOf ?? "").trim()) {
+        throw new HttpError(422, "ASOF_REQUIRED", "请填写期次数据截至时间（asOf，含时区，例 2026-10-21T18:00:00+08:00）");
+      }
+      json(res, 201, await store.createPeriod(body));
       return true;
     }
     if (req.method === "GET" && url.pathname === "/api/import/releases") {
