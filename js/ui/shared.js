@@ -20,8 +20,9 @@ export function panel(title, meta, ...children) {
   return h("article", { class: "dash-panel" }, h("header", { class: "dash-panel__head" }, h("h3", { text: title }), meta ? h("span", { class: "dash-panel__meta", text: meta }) : null), h("div", { class: "dash-panel__body" }, ...children));
 }
 
-export function kpi(label, value, hint, tone = "info") {
-  return h("article", { class: `dash-kpi dash-kpi--${tone}` }, h("span", { class: "dash-kpi__label", text: label }), h("strong", { class: "dash-kpi__value", text: fmt(value) }), hint ? h("span", { class: "dash-kpi__hint", text: hint }) : null);
+export function kpi(label, value, hint) {
+  // 数字本身没有语义色：颜色只用于状态，KPI 不做装饰性着色
+  return h("article", { class: "dash-kpi" }, h("span", { class: "dash-kpi__label", text: label }), h("strong", { class: "dash-kpi__value", text: fmt(value) }), hint ? h("span", { class: "dash-kpi__hint", text: hint }) : null);
 }
 
 export function empty(text = "暂无数据") {
@@ -36,7 +37,7 @@ export function qualityBadge(quality = {}) {
 
 export function bar(value, max, label) {
   const width = max ? Math.max(4, Math.round((value / max) * 100)) : 4;
-  return h("div", { class: "dash-bar-row" }, h("span", { class: "dash-bar-label", text: label }), h("span", { class: "dash-bar-track" }, h("i", { class: "dash-bar-fill", style: { width: `${width}%` } })), h("b", { text: fmt(value) }));
+  return h("div", { class: "dash-bar-row" }, h("span", { class: "dash-bar-label", text: label }), h("span", { class: "dash-bar-track" }, h("i", { class: "dash-bar-fill", style: { width: `${width}%` } })), h("b", { class: "dash-bar-value", text: fmt(value) }));
 }
 
 /** 单元格文本：NaN 这类无效数字一律显示「—」，绝不能把 JS 值原样吐到页面上 */
