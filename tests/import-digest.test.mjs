@@ -21,12 +21,14 @@ test("extracts report highlights with source evidence and requires review", () =
   assert.throws(() => reviewDigest(digest, { headline: { text: "杜撰结论", evidence: { sourceFileId: "other", blockId: "block-99" } }, highlights: [], watchItems: [] }, "信息部"), /原文证据/);
 });
 
-test("extracts a usable candidate from the current information department report", async () => {
-  const html = await readFile(new URL("../reports/2026-10-12_10-17/info-dept-weekly/index.html", import.meta.url), "utf8");
+test("extracts a usable candidate from a report with conclusion cards", async () => {
+  // 仓库不再携带真实周报，这里用合成报告锁定结论卡的抽取行为
+  const html = await readFile(new URL("./fixtures/import/verdict-report.html", import.meta.url), "utf8");
   const digest = extractDigestCandidates(segmentHtml(parse(html)), "weekly");
-  assert.match(digest.headline.text, /11 项变更/);
+  assert.match(digest.headline.text, /用量结构分化/);
   assert.ok(digest.highlights.length > 0);
   assert.ok(digest.watchItems.length > 0);
+  assert.equal(digest.headline.evidence.sourceFileId, "weekly");
 });
 
 test("uses a sourced fallback when a report omits standard section headings", () => {

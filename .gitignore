@@ -3,6 +3,13 @@
 .codebuddy/
 .local-data/
 data/inbox/
+
+# 运行期数据：只存在于目标机或本地，不随仓库分发
+/data/manifest.json
+/data/snapshots/
+/data/curation/
+/reports/
+
 .env
 .env.*
 storage/

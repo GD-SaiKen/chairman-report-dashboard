@@ -6,18 +6,21 @@
 
 站点是零依赖静态站：`npm start` 起 Node 内置服务即可查看；只有导入管理台需要 `busboy` + `parse5`。
 
-当前收录六期，页首下拉即可切换：
+## 数据与代码分离
 
-| 期次 | 数据窗口 | 接入方式 |
-| --- | --- | --- |
-| 2026-11-09 | 2026-11-09 ~ 11-15（7天） | 导入发布 · 第 46 周 |
-| 2026-11-02 | 2026-11-02 ~ 11-08（7天） | 导入发布 · 第 45 周 |
-| 2026-10-26 | 2026-10-26 ~ 11-01（7天） | 导入发布 · 第 44 周 |
-| 2026-10-19 | 2026-10-19 ~ 10-23（5天） | 导入发布 |
-| 2026-10-12 | 2026-10-12 ~ 10-17（6天） | 手工快照 |
-| 2026-09-20 | 2026-09-20 ~ 10-13（跨三周） | 手工快照 |
+`data/manifest.json`、`data/snapshots/`、`data/curation/` 与 `reports/` 都是**运行期数据**，已在 `.gitignore` 中排除，不随仓库分发。真实周报存档只保存在目标机或本地，GitHub 上只有代码。
 
-> 2026-10-19 起的四期由导入工作台发布。周报以叙述与表格为主，规则抽取只能拿到报告里显式列出的内容：拿不到的 KPI 一律留空显示「—」，不补 0。页面上的「需求条目」是报告表格行数，与报告自述的「有效需求」不是同一口径，读数字时以原文为准。
+新克隆的仓库先执行一次：
+
+```bash
+npm install
+npm run data:init     # 生成一份合成示例数据（data/snapshots/demo + reports/demo）
+npm start             # → http://localhost:5175
+```
+
+示例数据明确标注为「示例」，不对应任何真实部门、人员或指标，只用于打开页面、跑通渲染与发布链路。目标机**不要**执行 `data:init`：它保留自己的存档，脚本在 `data/manifest.json` 已存在时也会拒绝覆盖（除非显式 `--force`）。
+
+> 周报以叙述与表格为主，规则抽取只能拿到报告里显式列出的内容：拿不到的 KPI 一律留空显示「—」，不补 0。页面上的「需求条目」是报告表格行数，与报告自述的「有效需求」不是同一口径，读数字时以原文为准。
 
 
 ---
@@ -55,6 +58,8 @@
 # 只看导读与专题无需任何依赖；使用 HTML 导入管理台才需要安装下列两个依赖
 npm install            # 仅 busboy + parse5
 
+npm run data:init      # 没有 data/ 存档时，生成一份合成示例数据
+
 # 导入管理台的写操作是 fail-closed 的：不设来源会全数 403
 $env:AI_COCKPIT_ORIGIN = "http://localhost:5175"
 npm start              # → http://localhost:5175
@@ -74,9 +79,9 @@ npx serve . -l 5175
 验证：
 
 ```powershell
-npm test               # node --test，78 个用例
+npm test               # node --test，84 个用例
 npm run check          # 测试 + node --check
-npm run snapshot:validate -- --period 2026-10-12
+npm run snapshot:validate -- --period 2026-01-05   # 示例期次
 ```
 
 > 受限沙箱里 `node --test` 可能因无法 `spawn` 子进程而报 `EPERM`；此时用 `node --test --test-isolation=none` 在当前进程内跑同一批用例。
@@ -109,12 +114,17 @@ chairman-report-dashboard/
 │     └─ digest.mjs           # 导读候选抽取与审核（结论卡优先，标题兜底）
 ├─ manage/import/             # 导入管理工作台（不出现在普通导航中）
 ├─ deploy/                    # Nginx Basic Auth 与 systemd 示例
-├─ data/
-│  ├─ manifest.json           # 期次清单
-│  ├─ snapshots/{period}/     # 七个专题快照文件
-│  └─ curation/{period}.json  # 人工策展（可选增强项）
-├─ tests/                     # node --test + 自写 DOM 桩；含 CSS 令牌回归测试
-└─ reports/…                  # 报告全文；导入发布的版本目录为 {期次}-{releaseId}
+├─ data/                      # 运行期数据，仅 data/README.md 入库
+│  ├─ README.md               # 目录说明
+│  ├─ manifest.json           # 期次清单（发布或 npm run data:init 生成，gitignored）
+│  ├─ snapshots/{period}/     # 七个专题快照（gitignored）
+│  └─ curation/{period}.json  # 人工策展，可选（gitignored）
+├─ reports/                   # 报告全文（gitignored；示例由 data:init 生成）
+├─ scripts/
+│  ├─ init-data.mjs           # 合成示例数据生成器（npm run data:init）
+│  └─ build/validate/collect  # 快照与雷达脚本
+├─ tests/                     # node --test + 自写 DOM 桩；fixtures 全部为合成数据
+└─ …
 ```
 
 **分层约束**：`ui/*` 与 `core/*` 都不接触 DOM，可单独单元测试（渲染测试用 `tests/helpers/dom-stub.mjs` 提供极简 DOM 桩）；所有事件监听、观察器、定时器集中在 `app.js`，保证重渲染时先销毁再重建。
@@ -163,6 +173,8 @@ document.querySelector("#slot").append(renderOverview(snapshot, {}));
 > 新报告请走第八节的导入工作台：它会同时生成导读、净化全文并原子更新 manifest。本节只适用于补历史期次、或没有 Node 服务端、只能手工改静态目录的场景。
 
 站点是静态目录：**一期 = 拷贝报告全文到 `reports/` + 在 `data/manifest.json` 登记 + 在 `data/snapshots/{period}/` 放好七个快照文件**；快照可由 `npm run snapshot:build` 生成，也可由管理台导入发布产生。侧栏、期次下拉、报告入口均从 JSON 动态生成，无需改站点代码。
+
+下面这些操作只改本地或目标机的 `data/` 与 `reports/`。它们已被 `.gitignore` 排除，不会进入 Git；真实数据请留在目标机，不要提交。
 
 手工接入的目录约定与导入发布不同：手工用「窗口起止日 / 报告短名」，导入发布用「期次 ID / releaseId」，两者可以并存，`report.localPath` 各指各的。
 
@@ -294,8 +306,8 @@ ssh -T git@github.com-chairman-report
 
 ```powershell
 npm test
-npm run snapshot:validate -- --period 2026-10-12
-npm run snapshot:build -- --period 2026-10-12 --input .local-data/2026-10-12
+npm run snapshot:validate -- --period 2026-01-05
+npm run snapshot:build -- --period 2026-01-05 --input .local-data/2026-01-05
 npm start
 ```
 
@@ -305,7 +317,7 @@ npm start
 
 ```powershell
 $env:GITHUB_TOKEN = "<只在当前终端设置>"
-npm run radar:collect -- --period 2026-10-12 --output .local-data/2026-10-12/radar-candidates.json
+npm run radar:collect -- --period 2026-01-05 --output .local-data/2026-01-05/radar-candidates.json
 ```
 
 采集结果默认是未审核候选，不会自动进入正式 `radar.json`；信息部需补充公司适用性、风险和“关注 / 安排试用 / 建议引入 / 暂不采用”结论后再发布。
@@ -369,6 +381,39 @@ npm run check
 ```
 
 备份必须同时包含 `AI_COCKPIT_STORAGE`、`data/manifest.json`、`data/snapshots/` 和 `reports/`。模型密钥、Basic Auth 文件、上传原件和草稿不得提交 Git。故障恢复优先选择管理工作台中的已发布版本回滚；发布失败时保留当前 manifest，不手工拼接半份快照。
+
+### 从含数据的历史升级（目标机）
+
+本版把 `data/` 与 `reports/` 移出了版本库，并重写了历史。目标机原来是 `git pull` 部署的，升级时必须**先把数据备份到仓库外**，再重置到新历史，最后还原——否则 `git reset --hard` 会删掉旧提交里跟踪的 `data/` 与 `reports/`。
+
+```bash
+# Linux / systemd 目标机
+cd /path/to/chairman-report-dashboard
+sudo systemctl stop ai-cockpit
+git status --short                      # 先确认没有需要保留的代码改动
+
+stamp=$(date +%Y%m%d-%H%M%S)
+backup="$HOME/chairman-data-$stamp"
+mkdir -p "$backup"
+cp -a data reports "$backup"/
+
+git fetch origin
+git reset --hard origin/main            # 历史已重写，不能用普通 pull
+
+cp -a "$backup/data" "$backup/reports" .
+npm ci
+npm test
+sudo systemctl start ai-cockpit
+
+curl -I http://127.0.0.1:5175/
+```
+
+Windows 目标机把备份/还原换成 `Copy-Item` 即可。关键点：
+
+- 备份必须放在**仓库之外**，否则 reset 会一起清掉。
+- `reset --hard` 之后、还原之前不要执行 `npm run data:init`：它会生成示例 manifest，占用真实数据的配置。
+- 还原后 `git status` 应该是干净的（`data/` 与 `reports/` 已被忽略）。
+- `AI_COCKPIT_STORAGE`（草稿、上传原件、发布记录）在仓库外或 `.local-data/` 下，reset 不会动它，但仍建议一起备份。
 
 ## 九、可访问性清单
 
