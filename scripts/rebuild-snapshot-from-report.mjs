@@ -116,7 +116,10 @@ for (const periodId of targets) {
     continue;
   }
 
-  const changed = SNAPSHOT_FILES.filter((name) => JSON.stringify(current[name]) !== JSON.stringify(next[name]));
+  // 只比数据，不比生成时间：否则每次重建都因时间戳不同而「有变化」，
+  // 幂等性没了，diff 也看不出真实差异
+  const stripTime = (value) => JSON.stringify(value, (key, item) => (key === "generatedAt" ? undefined : item));
+  const changed = SNAPSHOT_FILES.filter((name) => stripTime(current[name]) !== stripTime(next[name]));
   const kpis = next.overview.kpis;
   const filled = Object.entries(kpis).filter(([, item]) => item != null).map(([key]) => key);
   console.log(`\n${periodId}  ${versionDir.split("/").pop()}`);
@@ -139,6 +142,7 @@ for (const periodId of targets) {
   }
 
   if (has("--write") && changed.length) {
+    // 只有数据真变了才刷新 generatedAt，纯时间戳差异不落盘
     for (const name of changed) await writeFile(resolve(versionDir, `${name}.json`), `${JSON.stringify(next[name], null, 2)}\n`, "utf8");
     console.log(`  ✓ 已写入 ${versionDir.replace(`${root}/`, "")}`);
   }
