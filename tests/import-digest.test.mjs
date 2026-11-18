@@ -87,6 +87,23 @@ test("falls back to heading semantics for reports without conclusion cards", () 
   assert.deepEqual(digest.watchItems, []);
 });
 
+test("prefers remaining key judgements over supporting findings", () => {
+  // 10 月 19 日那版周报：核心结论下分「关键判断 / 主要发现 / 建议行动」三段。
+  // 判断才是要点，主要发现是佐证，不能顶掉判断去当「关键进展」。
+  const blocks = segmentHtml(parse(`
+    <h2>核心结论</h2>
+    <h3>① 关键判断</h3>
+    <ul><li>DSH 是绝对主力。</li><li>托管主体只到可验收。</li><li>两个口径不能相加。（见 #s1）</li></ul>
+    <h3>② 主要发现</h3>
+    <ul><li>四仓 110 次提交。</li></ul>
+    <h3>③ 建议行动</h3>
+    <ul><li>补采缺失日期后再对齐。</li></ul>`));
+  const digest = extractDigestCandidates(blocks, "weekly");
+  assert.equal(digest.headline.text, "DSH 是绝对主力。");
+  assert.deepEqual(digest.highlights.map((item) => item.text), ["托管主体只到可验收。", "两个口径不能相加。"]);
+  assert.deepEqual(digest.watchItems.map((item) => item.text), ["补采缺失日期后再对齐。"]);
+});
+
 test("returns no candidates when a report has neither cards nor known headings", () => {
   const blocks = segmentHtml(parse("<div class=\"card\"><div class=\"num\">42</div></div>"));
   const digest = extractDigestCandidates(blocks, "weekly");

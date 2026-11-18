@@ -119,6 +119,24 @@ test("rejects HTML with missing local assets before publishing", async () => {
   } finally { await env.cleanup(); }
 });
 
+test("backfilling an older period keeps the latest period as the default", async () => {
+  const env = await makeEnv();
+  try {
+    const manifestPath = join(env.root, "data", "manifest.json");
+    const seeded = JSON.parse(await readFile(manifestPath, "utf8"));
+    seeded.periods.unshift({ id: "2027-01-01", label: "更新期", window: "w", asOf: "2027-01-01T00:00:00+08:00", files: seeded.periods[0].files });
+    seeded.defaultPeriodId = "2027-01-01";
+    await writeFile(manifestPath, `${JSON.stringify(seeded)}\n`, "utf8");
+
+    const draft = await approvedDraft();
+    await publishDraft({ periodId: "2026-10-27", draft, root: env.root, storageRoot: env.storageRoot, actor: "信息部" });
+
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    assert.equal(manifest.defaultPeriodId, "2027-01-01", "回填旧期不应把首页默认期次改回旧期");
+    assert.deepEqual(manifest.periods.map((period) => period.id), ["2027-01-01", "2026-10-27", "2026-01-01"]);
+  } finally { await env.cleanup(); }
+});
+
 test("a failed publish leaves no staged snapshot or partial manifest behind", async () => {
   const env = await makeEnv();
   try {

@@ -1,4 +1,9 @@
-const CONCISE = (text) => String(text || "").replace(/\s+/g, " ").trim().slice(0, 280);
+const CONCISE = (text) => String(text || "")
+  // 报告里的「（见 #s1）」是站内锚点提示，放进导读只会让结论读起来像草稿
+  .replace(/（见[^）]*#[^）]*）/g, "")
+  .replace(/\s+/g, " ")
+  .trim()
+  .slice(0, 280);
 
 function candidate(text, block, sourceFileId, extra = {}) {
   const concise = CONCISE(text);
@@ -63,7 +68,8 @@ export function extractDigestCandidates(blocks, sourceFileId) {
   }
   return {
     headline: conclusions[0] || progress[0] || fallback[0] || null,
-    highlights: (progress.length ? progress : conclusions.slice(1)).slice(0, 6),
+    // 有多条「关键判断」时，它们本身就是本期要点；只有一条时才退到「主要发现」
+    highlights: (conclusions.length > 1 ? conclusions.slice(1) : progress).slice(0, 6),
     watchItems: (watch.length ? watch : conclusions.filter((item) => /待|风险|必须/.test(item.text))).slice(0, 4),
     reviewed: false,
   };

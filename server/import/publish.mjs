@@ -88,7 +88,11 @@ export async function publishDraft({ periodId, draft, root, storageRoot, actor }
       asOf: draft.period.asOf,
       files: Object.fromEntries(SNAPSHOT_FILES.map((name) => [name, `data/snapshots/${versionName}/${name}.json`])),
     };
-    const manifest = { ...oldManifest, defaultPeriodId: periodId, periods: [period, ...oldManifest.periods.filter((item) => item.id !== periodId)] };
+    // 期次按 id 倒序（新期在上）。回填或修订旧期时不能把默认期次改成旧期，
+    // 否则用户打开首页会退回历史期次。
+    const periods = [period, ...oldManifest.periods.filter((item) => item.id !== periodId)]
+      .sort((a, b) => String(b.id).localeCompare(String(a.id)));
+    const manifest = { ...oldManifest, defaultPeriodId: periods[0].id, periods };
     const manifestChecked = validateManifest(manifest);
     if (!manifestChecked.ok) throw new Error(`manifest invalid: ${manifestChecked.errors.join("; ")}`);
 
