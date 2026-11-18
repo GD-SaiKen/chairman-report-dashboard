@@ -1,5 +1,6 @@
 .workbuddy/
 .cursor/
+.codebuddy/
 .local-data/
 data/inbox/
 .env
