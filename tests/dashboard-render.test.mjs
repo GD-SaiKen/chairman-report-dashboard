@@ -184,3 +184,19 @@ test("demand funnel explains missing stages instead of showing a row of zeros", 
     uninstall();
   }
 });
+
+test("overview marks missing stage and reusable evidence instead of printing zeros", () => {
+  const uninstall = installDom();
+  try {
+    const snapshot = buildImportSnapshot();
+    snapshot.demands.demands = snapshot.demands.demands.map((item) => ({ ...item, reusable: null }));
+    snapshot.overview.demandFunnel = { counts: { captured: 0, assessed: 0, designed: 0, delivered: 0, reused: 0, closed: 0 }, total: 1, opportunities: 0 };
+    snapshot.overview.capabilities = { ...snapshot.overview.capabilities, runs: null };
+    const html = serialize(renderOverview(snapshot));
+    assert.match(html, /报告未提供需求的分阶段状态/);
+    assert.match(html, /— 个可复用机会/);
+    assert.match(html, /运行次数未提供/);
+  } finally {
+    uninstall();
+  }
+});
