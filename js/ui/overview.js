@@ -26,7 +26,11 @@ export function renderOverview(snapshot) {
   // 分阶段状态与可复用标记都可能整列为空：此时 0 是「没抽到」，不是「确实是 0」
   const hasStages = Object.values(funnel).some((value) => Number(value) > 0);
   const hasReusable = demandRows.some((item) => typeof item.reusable === "boolean");
-  const agentsHint = capabilities.runs == null ? "运行次数未提供" : `${fmt(capabilities.runs)} 次运行`;
+  const agentsHint = kpis.activeAgents == null
+    ? "报告未提供 Agent 清单"
+    : capabilities.runs == null ? "运行次数未提供" : `${fmt(capabilities.runs)} 次运行`;
+  const hasDepartments = departments.length > 0;
+  const hasRadar = radar.length > 0 || Boolean(snapshot.radar?.updated);
 
   return h("div", { class: "dashboard-page" },
     h("section", { class: "dashboard-hero digest-hero" },
@@ -43,14 +47,14 @@ export function renderOverview(snapshot) {
       watchItems.length ? panel("待关注", `${watchItems.length} 项`, h("ul", { class: "digest-list digest-list--watch" }, watchItems.map((item) => h("li", { text: typeof item === "string" ? item : item.text })))) : null
     )) : null,
     section("关键数据", "仅展示本期可核对的运营信号", h("div", { class: "dash-kpis" },
-      kpi("活跃部门", kpis.activeDepartments, "一级部门"), kpi("活跃人员", kpis.activeUsers, "产生有效业务需求"),
+      kpi("活跃部门", kpis.activeDepartments, "有使用的部门"), kpi("活跃人员", kpis.activeUsers, "产生有效业务需求"),
       kpi("需求条目", kpis.validDemands, "去重后的需求条目"), kpi("活跃 Agents", kpis.activeAgents, agentsHint)
     ), sourceLine ? h("p", { class: "dash-source", text: `核对来源：${sourceLine}` }) : null),
     section("专题数据", "需要进一步核对时，进入对应专题", h("div", { class: "digest-topics" },
-      panel("部门采用", `${departments.length} 个部门`, departments.length ? h("div", { class: "dash-bars" }, departments.slice(0, 5).map((item) => bar(item.activeUsers || 0, maxUsers, item.name))) : null, linkButton("departments", "查看部门")),
+      panel("部门采用", hasDepartments ? `${departments.length} 个部门` : "本期未提供", hasDepartments ? h("div", { class: "dash-bars" }, departments.slice(0, 5).map((item) => bar(item.activeUsers || 0, maxUsers, item.name))) : h("p", { class: "dash-hint", text: "本期报告未按部门拆分使用情况" }), linkButton("departments", "查看部门")),
       panel("需求机会", `${hasReusable ? fmt(overview.demandFunnel?.opportunities) : "—"} 个可复用机会`, h("p", { class: "dash-hint", text: hasStages ? `${fmt(funnel.delivered)} 项已交付 · ${fmt(funnel.reused)} 项已复用` : "报告未提供需求的分阶段状态" }), linkButton("demands", "查看需求")),
       panel("能力与 Token", `${fmt(capabilities.active)} 项能力活跃`, h("p", { class: "dash-hint", text: `${pct(capabilities.successRate)} 成功率 · ${fmtM(tokens.effective)} 有效 Token` }), linkButton("capabilities", "查看能力"), linkButton("tokens", "查看 Token")),
-      panel("AI 前沿雷达", `${radar.length} 条已审核`, h("p", { class: "dash-hint", text: "仅展示经信息部审核的候选" }), linkButton("radar", "查看雷达"))
+      panel("AI 前沿雷达", hasRadar ? `${radar.length} 条已审核` : "本期未提供", h("p", { class: "dash-hint", text: hasRadar ? "仅展示经信息部审核的候选" : "本期周报没有前沿雷达章节" }), linkButton("radar", "查看雷达"))
     )),
     snapshot.quality?.warnings?.length ? section("数据说明", "阅读数字时请留意以下口径", panel("质量提醒", `${snapshot.quality.warnings.length} 条`, h("ul", { class: "dash-list" }, snapshot.quality.warnings.map((warning) => h("li", { text: warning }))))) : null
   );

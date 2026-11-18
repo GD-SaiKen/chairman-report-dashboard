@@ -23,6 +23,8 @@ export function snapshotFromDraft(draft = {}, extra = {}) {
   const radar = candidates.radar;
 
   return buildSnapshotFiles({
+    // 报告点名写出的期间口径（业务活跃用户 44 这类）优先于按明细累加
+    kpiOverrides: draft.kpis || null,
     period: { start: period.id || null, end: period.end || null },
     departments: candidates.departments,
     demands: candidates.demands,

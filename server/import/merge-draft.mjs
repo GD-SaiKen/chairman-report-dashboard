@@ -15,6 +15,16 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** 报告部门名 → 稳定 id；未映射一级部门时用它当下钻键 */
+function departmentId(name) {
+  const slug = String(name ?? "").toLowerCase()
+    .replace(/[\s\u3000]+/g, "-")
+    .replace(/[\\/"'<>#?%]/g, "")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "department";
+}
+
 function normalizeText(value) {
   const text = String(value ?? "").trim().toLowerCase();
   return text || null;
@@ -41,23 +51,47 @@ export function mergeDraft({ files = [], ruleResults = [], aiResults = [], curat
   const radar = [];
   const byName = new Map();
   const known = new Map(departmentDictionary.map((item) => [item.name, item]));
+  const kpis = {};
+  const unmapped = [];
   const sources = [...ruleResults, ...aiResults];
 
   for (const source of sources) {
-    for (const item of source.departmentCandidates || source.departments || []) {
-      const department = known.get(item.name);
-      if (!department) {
-        addIssue(issues, { id: `unknown-${item.name}`, code: "UNKNOWN_DEPARTMENT", severity: "blocking", message: `未识别一级部门：${item.name}`, resolved: false });
+    for (const item of source.kpiCandidates || []) {
+      const value = toNumber(item.value);
+      if (value == null || !item.key) continue;
+      if (item.key in kpis) {
+        if (kpis[item.key] !== value) addIssue(issues, { id: `kpi-conflict-${item.key}`, code: "KPI_CONFLICT", severity: "warning", message: `${item.key} 存在不同来源值，已采用首个`, resolved: false });
         continue;
       }
+      kpis[item.key] = value;
+    }
+
+    for (const item of source.departmentCandidates || source.departments || []) {
+      const name = String(item.name ?? "").trim();
+      if (!name) continue;
+      // 报告里的部门粒度常比驾驶舱的一级部门更细（车间 / 电脑室 / 财务部）。
+      // 未映射时按原名落库并留一条提醒，不静默丢掉，也不擅自归并。
+      const department = known.get(name) || { id: departmentId(name), name };
+      // 多个未映射部门合并成一条提醒，避免首页「数据说明」被十几行同名警告淹没
+      if (!known.has(name) && !unmapped.includes(name)) unmapped.push(name);
       const prior = byName.get(department.id);
-      if (prior && prior.activeUsers !== item.activeUsers) {
-        addIssue(issues, { id: `conflict-${department.id}`, code: "SOURCE_CONFLICT", severity: "blocking", message: `${department.name} 活跃人数存在不同来源值`, resolved: false });
-      } else if (!prior) {
-        const value = { ...department, activeUsers: item.activeUsers };
+      if (!prior) {
+        const value = {
+          ...department,
+          activeUsers: toNumber(item.activeUsers),
+          validDemands: toNumber(item.validDemands),
+          activeSkills: null,
+          activeAgents: null,
+          outputs: null,
+        };
         byName.set(department.id, value);
         departments.push(value);
+      } else if (toNumber(item.activeUsers) != null && prior.activeUsers != null && prior.activeUsers !== toNumber(item.activeUsers)) {
+        addIssue(issues, { id: `conflict-${department.id}`, code: "SOURCE_CONFLICT", severity: "blocking", message: `${department.name} 活跃人数存在不同来源值`, resolved: false });
+      } else if (prior.activeUsers == null && toNumber(item.activeUsers) != null) {
+        prior.activeUsers = toNumber(item.activeUsers);
       }
+      if (prior && prior.validDemands == null && toNumber(item.validDemands) != null) prior.validDemands = toNumber(item.validDemands);
     }
 
     for (const item of source.demandCandidates || source.demands || []) {
@@ -87,6 +121,10 @@ export function mergeDraft({ files = [], ruleResults = [], aiResults = [], curat
         departmentIds: Array.isArray(item.departmentIds) ? item.departmentIds : [],
         runs: toNumber(item.runs),
         successes: toNumber(item.successes),
+        // 周报给的是「业务调用 / 真失败」，失败数与成功率要原样带下去，
+        // 否则能力专题只能显示「— 成功率」
+        failures: toNumber(item.failures),
+        successRate: toNumber(item.successRate),
         outputs: toNumber(item.outputs),
         linkedDemandIds: Array.isArray(item.linkedDemandIds) ? item.linkedDemandIds : [],
         failureReason: item.failureReason || null,
@@ -99,8 +137,8 @@ export function mergeDraft({ files = [], ruleResults = [], aiResults = [], curat
       const reconciliationOnly = Boolean(item.reconciliationOnly) || AIKEY.test(sourceName || "");
       tokens.push({
         source: sourceName,
-        input: null,
-        output: null,
+        input: toNumber(item.input),
+        output: toNumber(item.output),
         effective: toNumber(item.effective),
         cacheRead: toNumber(item.cacheRead),
         classification: pickEnum(item.classification, ["business", "test", "system"]),
@@ -132,11 +170,23 @@ export function mergeDraft({ files = [], ruleResults = [], aiResults = [], curat
     }
   }
 
+  if (unmapped.length) {
+    addIssue(issues, {
+      id: "unmapped-departments",
+      code: "UNMAPPED_DEPARTMENT",
+      // info 级：按原名展示是可用状态，不该把整期标成「数据警告」
+      severity: "info",
+      message: `${unmapped.length} 个报告部门未映射一级部门，按原名展示：${unmapped.slice(0, 6).join("、")}${unmapped.length > 6 ? " 等" : ""}`,
+      resolved: false,
+    });
+  }
+
   // 人工策展优先于抽取：策展缺失时才回落到抽取结果
   const fallback = (collected, curated) => (collected.length ? collected : curated ?? null);
 
   return {
     files,
+    kpis,
     candidates: {
       departments: departments.length ? departments : curation.departments ?? null,
       demands: fallback(demands, curation.demands),
@@ -144,7 +194,8 @@ export function mergeDraft({ files = [], ruleResults = [], aiResults = [], curat
       tokens: fallback(tokens, curation.tokens),
       radar: fallback(radar, curation.radar),
     },
-    quality: { status: issues.length ? "warning" : "ok", issues },
+    // info 只是阅读提示，不影响「数据是否可正常使用」的判断
+    quality: { status: issues.some((issue) => issue.severity !== "info") ? "warning" : "ok", issues },
     revisions: [],
     curation,
   };

@@ -77,12 +77,25 @@ export function summarizeCapabilities(capabilities = [], runs = []) {
     if (run.status === "failure") result.failures += 1;
     if (run.deliverableId || run.deliveryStatus === "sent") result.outputs += 1;
   }
+  // 周报只给「调用次数 / 真失败」这类汇总，没有逐次运行记录：
+  // 此时用能力资产自带的汇总量算成功率，而不是留空或拿 0 条运行当 0 次。
+  if (!runs.length) {
+    const withRuns = capabilities.filter((item) => Number.isFinite(Number(item.runs)));
+    if (withRuns.length) {
+      result.runs = withRuns.reduce((total, item) => total + Number(item.runs), 0);
+      result.successes = withRuns.reduce((total, item) => total + (Number.isFinite(Number(item.successes)) ? Number(item.successes) : 0), 0);
+      result.failures = withRuns.reduce((total, item) => total + (Number.isFinite(Number(item.failures)) ? Number(item.failures) : 0), 0);
+    }
+  }
   result.successRate = result.runs ? result.successes / result.runs : null;
   return result;
 }
 
 export function summarizeTokens(records = []) {
   const result = { input: 0, output: 0, cacheRead: 0, effective: 0, nonBusiness: 0, reconciliationOnly: 0, sourceBreakdown: {} };
+  // 没有任何一条记录带缓存读数时，缓存占比是「未知」而不是 0%：
+  // 周报的通道表只有请求/输入/输出/合计，没有缓存列
+  let sawCache = false;
   for (const record of records) {
     const total = (record.input || 0) + (record.output || 0);
     const source = result.sourceBreakdown[record.source] ||= { effective: 0, cacheRead: 0, nonBusiness: 0 };
@@ -95,15 +108,19 @@ export function summarizeTokens(records = []) {
           : total;
       continue;
     }
-    result.cacheRead += record.cacheRead || 0;
-    source.cacheRead += record.cacheRead || 0;
+    if (record.cacheRead != null && Number.isFinite(Number(record.cacheRead))) {
+      sawCache = true;
+      result.cacheRead += Number(record.cacheRead);
+      source.cacheRead += Number(record.cacheRead);
+    }
     if (record.classification === "business") {
       result.input += record.input || 0; result.output += record.output || 0; result.effective += total; source.effective += total;
     } else {
       result.nonBusiness += total; source.nonBusiness += total;
     }
   }
-  result.cacheRate = result.input + result.cacheRead ? result.cacheRead / (result.input + result.cacheRead) : null;
+  result.cacheRead = sawCache ? result.cacheRead : null;
+  result.cacheRate = sawCache && result.input + result.cacheRead ? result.cacheRead / (result.input + result.cacheRead) : null;
   return result;
 }
 

@@ -8,7 +8,7 @@ import { mergeDraft } from "./merge-draft.mjs";
 import { extractDigestCandidates } from "./digest.mjs";
 import { transitionImport } from "./state-machine.mjs";
 
-const DEPARTMENTS = ["品质", "制造", "五金", "采购", "人资", "研发/工程", "法务/知识产权", "信息部"].map((name, index) => ({ id: ["quality", "manufacturing", "hardware", "purchasing", "hr", "research", "legal", "information"][index], name }));
+export const DEPARTMENTS = ["品质", "制造", "五金", "采购", "人资", "研发/工程", "法务/知识产权", "信息部"].map((name, index) => ({ id: ["quality", "manufacturing", "hardware", "purchasing", "hr", "research", "legal", "information"][index], name }));
 
 /** 读取人工策展数据；缺失时返回 {}，不作为错误 —— 它是可选增强项 */
 export async function loadPeriodCuration(curationRoot, periodId) {

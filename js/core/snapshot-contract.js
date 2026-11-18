@@ -58,14 +58,16 @@ function countActiveCapabilities(capabilities) {
 
 function countActiveAgents(capabilities) {
   const agents = capabilities.filter((item) => item.type === "agent");
-  if (!agents.length) return 0;
+  // 没有 agent 分类的资产清单，不等于「活跃 Agent 为 0」。周报只报能力调用时，
+  // 这里必须是未知（显示「—」），否则 0 会被读成「一个 agent 都没跑」。
+  if (!agents.length) return UNKNOWN;
   if (agents.every((item) => item.active == null)) return UNKNOWN;
   return agents.filter((item) => item.active).length;
 }
 
 function countActiveSkills(capabilities) {
   const skills = capabilities.filter((item) => item.type === "skill");
-  if (!skills.length) return 0;
+  if (!skills.length) return UNKNOWN;
   if (skills.every((item) => item.active == null)) return UNKNOWN;
   return skills.filter((item) => item.active).length;
 }
@@ -115,6 +117,7 @@ function normalizeInput(input = {}) {
     digest: isObject(input.digest) ? input.digest : UNKNOWN,
     quality: isObject(input.quality) ? input.quality : UNKNOWN,
     radarUpdatedAt: input.radarUpdatedAt ?? UNKNOWN,
+    kpiOverrides: isObject(input.kpiOverrides) ? input.kpiOverrides : UNKNOWN,
     validMessages: n(input.validMessages),
     generatedAt: input.generatedAt ?? UNKNOWN,
   };
@@ -124,6 +127,7 @@ function normalizeInput(input = {}) {
 
 function buildKpis(input) {
   const { activities, departments, capabilities, demands } = input;
+  const overrides = isObject(input.kpiOverrides) ? input.kpiOverrides : {};
   // 有实名活动记录时走 metrics 的采用汇总；否则退回部门上报的活跃人数
   const adoption = activities ? summarizeAdoption(activities, input.period) : UNKNOWN;
   const fromDepartments = (field) => (departments ? sumOrNull(departments, (item) => item[field]) : UNKNOWN);
@@ -137,7 +141,7 @@ function buildKpis(input) {
       ? departments.filter((item) => (n(item.activeUsers) ?? 0) > 0).length || UNKNOWN
       : UNKNOWN;
 
-  return {
+  const kpis = {
     activeDepartments,
     activeUsers,
     newUsers,
@@ -151,6 +155,13 @@ function buildKpis(input) {
     activeAgents: capabilities ? countActiveAgents(capabilities) : UNKNOWN,
     activeSkills: capabilities ? countActiveSkills(capabilities) : UNKNOWN,
   };
+  // 报告里点名写出的期间口径（如「业务活跃用户 44」）优先于按明细累加的结果：
+  // 明细表常常只覆盖一部分人/部门，累加会系统性偏低。只认 KPI_KEYS 里的键。
+  for (const key of KPI_KEYS) {
+    const value = n(overrides[key]);
+    if (value !== UNKNOWN) kpis[key] = value;
+  }
+  return kpis;
 }
 
 function buildDemandFunnel(demands) {
@@ -403,6 +414,7 @@ function buildQuality(quality, input) {
  * @param {Array} [input.radar]          雷达条目（发布时只应传 reviewStatus==='approved' 的）
  * @param {Object} [input.report]        {title,window,localPath,onlineUrl}
  * @param {Object} [input.quality]       {status,generatedAt,sources,warnings}
+ * @param {Object} [input.kpiOverrides]  报告里明确写出的期间口径，覆盖按明细累加的 KPI
  * @returns {Record<string, Object>} 键与 SNAPSHOT_FILES 一致
  */
 export function buildSnapshotFiles(rawInput = {}) {

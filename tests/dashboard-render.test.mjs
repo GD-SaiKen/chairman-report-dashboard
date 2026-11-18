@@ -195,7 +195,11 @@ test("overview marks missing stage and reusable evidence instead of printing zer
     const html = serialize(renderOverview(snapshot));
     assert.match(html, /报告未提供需求的分阶段状态/);
     assert.match(html, /— 个可复用机会/);
-    assert.match(html, /运行次数未提供/);
+    // 能力表没有 agent 分类时，优先说明「没有 Agent 清单」，而不是拿运行次数顶替
+    assert.match(html, /报告未提供 Agent 清单/);
+    // 有 Agent 数但缺运行次数时，才退回到「运行次数未提供」
+    const withAgents = { ...snapshot, overview: { ...snapshot.overview, kpis: { ...snapshot.overview.kpis, activeAgents: 3 }, capabilities: { ...snapshot.overview.capabilities, runs: null } } };
+    assert.match(serialize(renderOverview(withAgents)), /运行次数未提供/);
   } finally {
     uninstall();
   }

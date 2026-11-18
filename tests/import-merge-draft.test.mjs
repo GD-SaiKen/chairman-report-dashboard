@@ -19,9 +19,14 @@ test("does not add aikey reconciliation to effective tokens", () => {
   assert.equal(snapshot.tokens.byPlatform.find((item) => item.name === "aikey gateway").reconciliationOnly, true);
 });
 
-test("blocks unknown departments and source conflicts", () => {
+test("keeps unmapped departments under their report name and blocks only source conflicts", () => {
   const draft = mergeDraft({ files: [], ruleResults: [{ departmentCandidates: [{ name: "未知部", activeUsers: 2 }] }, { departmentCandidates: [{ name: "品质", activeUsers: 8 }, { name: "品质", activeUsers: 9 }] }], aiResults: [], curation: {}, departmentDictionary: [{ id: "quality", name: "品质" }] });
-  assert.equal(draft.quality.issues.some((item) => item.code === "UNKNOWN_DEPARTMENT" && item.severity === "blocking"), true);
+  // 周报的部门粒度比驾驶舱一级部门细（车间 / 电脑室 / 财务部）：未映射按原名保留并提醒，
+  // 不再阻断发布——阻断会让整期发布不了，正是页面长期只剩「—」的原因
+  assert.equal(draft.quality.issues.some((item) => item.code === "UNMAPPED_DEPARTMENT" && item.severity === "info"), true);
+  assert.equal(draft.quality.issues.some((item) => item.code === "UNKNOWN_DEPARTMENT"), false);
+  assert.equal(draft.candidates.departments.some((item) => item.name === "未知部"), true);
+  // 同一部门两个不同数值仍然是阻断问题，不能悄悄取一个
   assert.equal(draft.quality.issues.some((item) => item.code === "SOURCE_CONFLICT"), true);
   assert.equal(canApproveDraft(draft), false);
 });
