@@ -1,22 +1,52 @@
 import { section, panel, kpi, bar, fmt, fmtM, pct, linkButton, h } from "./shared.js";
 
+function displayAsOf(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
 export function renderOverview(snapshot) {
   const overview = snapshot.overview || {};
+  const report = overview.report;
+  const digest = overview.digest || {};
+  const highlights = (digest.highlights || []).slice(0, 3);
+  const watchItems = (digest.watchItems || []).slice(0, 2);
   const kpis = overview.kpis || {};
   const departments = snapshot.departments?.departments || [];
   const funnel = overview.demandFunnel?.counts || {};
   const capabilities = overview.capabilities || {};
   const tokens = overview.tokens || {};
   const radar = snapshot.radar?.items || [];
+  const sourceNames = { sino: "Sino WebUI", hermes: "Hermes WebUI", departments: "部门记录", "legacy-catalog": "历史目录" };
+  const dataSources = (snapshot.quality?.sources || []).filter((item) => item.id && item.id !== "aikey" && item.status !== "missing");
+  const sourceLine = dataSources.map((item) => `${sourceNames[item.id] || item.id}${item.asOf ? `（${item.asOf}）` : ""}`).join(" · ");
   const maxUsers = Math.max(...departments.map((item) => item.activeUsers || 0), 1);
+
   return h("div", { class: "dashboard-page" },
-    h("section", { class: "dashboard-hero" }, h("div", null, h("p", { class: "hero__eyebrow", text: `数据窗口 ${snapshot.period.window}` }), h("h1", { text: "公司 AI 运转驾驶舱" }), h("p", { text: "先看普及程度，再看需求、能力、Token 与前沿变化。" })), h("div", { class: "hero__signal" }, h("strong", { text: `${fmt(kpis.activeDepartments)} 个活跃部门` }), h("span", { text: `${fmt(kpis.activeUsers)} 名活跃人员 · ${fmt(kpis.validDemands)} 条有效需求` }))),
-    section("AI 普及总览", "当前不计算部门覆盖率，先观察活跃、复用和增长信号", h("div", { class: "dash-kpis" }, kpi("活跃部门", kpis.activeDepartments, "一级部门"), kpi("活跃人员", kpis.activeUsers, "产生有效业务需求"), kpi("新增用户", kpis.newUsers, "历史首次出现"), kpi("复用用户", kpis.repeatUsers, pct(kpis.repeatRate)), kpi("有效需求", kpis.validDemands, "去重后业务请求"), kpi("活跃 Agents", kpis.activeAgents, `${fmt(capabilities.runs)} 次运行`, "info"))),
-    section("部门采用态势", "按活跃人员排序，点击进入实名与主题下钻", panel("一级部门热力", `${departments.length} 个部门`, departments.length ? h("div", { class: "dash-bars" }, departments.map((item) => bar(item.activeUsers || 0, maxUsers, item.name))) : null, linkButton("departments", "查看部门专题"))),
-    section("AI 需求机会", "把重复需求变成可复用能力", panel("机会漏斗", `${fmt(overview.demandFunnel?.opportunities)} 个可复用机会`, h("div", { class: "funnel" }, ["captured", "assessed", "designed", "delivered", "reused"].map((state) => h("div", { class: "funnel__step" }, h("strong", { text: fmt(funnel[state] || 0) }), h("span", { text: { captured: "已收集", assessed: "已评估", designed: "已方案化", delivered: "已交付", reused: "已复用" }[state] })))), linkButton("demands", "查看需求机会"))),
-    section("能力资产与 Token", "成功产出和有效消耗分开看", h("div", { class: "dash-grid-2" }, panel("Skills / Agents 产出", `${capabilities.successRate ? pct(capabilities.successRate) : "—"} 成功率`, h("div", { class: "stat-pairs" }, h("span", null, h("b", { text: fmt(capabilities.total) }), "资产"), h("span", null, h("b", { text: fmt(capabilities.active) }), "当期活跃"), h("span", null, h("b", { text: fmt(capabilities.outputs) }), "成功产出")), linkButton("capabilities", "查看能力资产")), panel("Token 结构", `${pct(tokens.cacheRate)} 缓存占比`, h("div", { class: "stat-pairs" }, h("span", null, h("b", { text: fmtM(tokens.effective) }), "有效消耗"), h("span", null, h("b", { text: fmtM(tokens.cacheRead) }), "上下文重读"), h("span", null, h("b", { text: fmtM(tokens.nonBusiness) }), "非业务消耗")), linkButton("tokens", "查看 Token 效率")))),
-    section("本周 AI 前沿雷达", "自动候选由信息部审核后发布", panel("值得关注", `${radar.length} 条已审核`, h("div", { class: "radar-preview" }, radar.slice(0, 3).map((item) => h("a", { href: item.url, target: "_blank", rel: "noopener noreferrer" }, h("strong", { text: item.name }), h("span", { text: `${item.type === "topic" ? "话题" : item.type === "agent-tool" ? "智能体工具" : "AI 工具"} · ${item.decision}` })))), linkButton("radar", "查看完整雷达"))),
-    snapshot.overview?.report ? section("报告归档", "保留原始周报全文入口", panel(snapshot.overview.report.title || "信息部周报", snapshot.overview.report.window || "", h("div", { class: "stat-pairs" }, h("span", null, h("a", { href: snapshot.overview.report.localPath, text: "打开本地全文" })), snapshot.overview.report.onlineUrl ? h("span", null, h("a", { href: snapshot.overview.report.onlineUrl, target: "_blank", rel: "noopener noreferrer", text: "打开线上原件" })) : null))) : null,
-    snapshot.quality?.warnings?.length ? section("数据质量与管理提醒", "先处理口径，再解读趋势", panel("需要留意", `${snapshot.quality.warnings.length} 条`, h("ul", { class: "dash-list" }, snapshot.quality.warnings.map((warning) => h("li", { text: warning })))) ) : null
+    h("section", { class: "dashboard-hero digest-hero" },
+      h("div", null,
+        h("p", { class: "hero__eyebrow", text: `信息部报告 · ${snapshot.period.window}` }),
+        h("h1", { text: digest.headline || report?.title || "公司 AI 运转报告" }),
+        h("p", { class: "hero__sub", text: digest.summary || `数据截至 ${displayAsOf(snapshot.period.asOf)}。${report?.localPath ? "本页提炼本期重点，可继续阅读完整报告。" : "本页展示本期已有的关键数据与专题资料。"}` }),
+        report?.localPath ? h("a", { class: "btn btn--primary digest-read", href: report.localPath, text: "阅读全文　→" }) : h("p", { class: "digest-missing", text: "本期全文尚未发布" })
+      ),
+      h("div", { class: "hero__signal digest-date" }, h("strong", { text: snapshot.period.label }), h("span", { text: `截至 ${displayAsOf(snapshot.period.asOf)}` }))
+    ),
+    highlights.length || watchItems.length ? section("本期要点", digest.reviewer ? `从报告提取 · ${digest.reviewer}审核` : "据报告原文整理", h("div", { class: "digest-grid" },
+      highlights.length ? panel("关键进展", `${highlights.length} 项`, h("ol", { class: "digest-list" }, highlights.map((item) => h("li", { text: typeof item === "string" ? item : item.text })))) : null,
+      watchItems.length ? panel("待关注", `${watchItems.length} 项`, h("ul", { class: "digest-list digest-list--watch" }, watchItems.map((item) => h("li", { text: typeof item === "string" ? item : item.text })))) : null
+    )) : null,
+    section("关键数据", "仅展示本期可核对的运营信号", h("div", { class: "dash-kpis" },
+      kpi("活跃部门", kpis.activeDepartments, "一级部门"), kpi("活跃人员", kpis.activeUsers, "产生有效业务需求"),
+      kpi("有效需求", kpis.validDemands, "去重后业务请求"), kpi("活跃 Agents", kpis.activeAgents, `${fmt(capabilities.runs)} 次运行`)
+    ), sourceLine ? h("p", { class: "dash-source", text: `核对来源：${sourceLine}` }) : null),
+    section("专题数据", "需要进一步核对时，进入对应专题", h("div", { class: "digest-topics" },
+      panel("部门采用", `${departments.length} 个部门`, departments.length ? h("div", { class: "dash-bars" }, departments.slice(0, 5).map((item) => bar(item.activeUsers || 0, maxUsers, item.name))) : null, linkButton("departments", "查看部门")),
+      panel("需求机会", `${fmt(overview.demandFunnel?.opportunities)} 个可复用机会`, h("p", { class: "dash-hint", text: `${fmt(funnel.delivered)} 项已交付 · ${fmt(funnel.reused)} 项已复用` }), linkButton("demands", "查看需求")),
+      panel("能力与 Token", `${fmt(capabilities.active)} 项能力活跃`, h("p", { class: "dash-hint", text: `${pct(capabilities.successRate)} 成功率 · ${fmtM(tokens.effective)} 有效 Token` }), linkButton("capabilities", "查看能力"), linkButton("tokens", "查看 Token")),
+      panel("AI 前沿雷达", `${radar.length} 条已审核`, h("p", { class: "dash-hint", text: "仅展示经信息部审核的候选" }), linkButton("radar", "查看雷达"))
+    )),
+    snapshot.quality?.warnings?.length ? section("数据说明", "阅读数字时请留意以下口径", panel("质量提醒", `${snapshot.quality.warnings.length} 条`, h("ul", { class: "dash-list" }, snapshot.quality.warnings.map((warning) => h("li", { text: warning }))))) : null
   );
 }

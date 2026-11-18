@@ -174,3 +174,21 @@ test("creating a period without asOf fails immediately with 422 instead of at pu
     await env.cleanup();
   }
 });
+
+test("a report draft cannot be approved until its sourced digest is reviewed", async () => {
+  const env = await makeEnv();
+  try {
+    await request(env.routes, { method: "POST", path: "/api/import/periods", headers: CSRF, body: JSON.stringify({ id: "2026-10-27", label: "2026-10-27 期", window: "2026-10-27 ~ 11-02", asOf: "2026-11-02T18:00:00+08:00" }) });
+    const current = await env.store.getPeriod("2026-10-27");
+    await env.store.savePeriod("2026-10-27", { ...current, status: "review_required" });
+    const headline = { text: "完成制造系统异常闭环", evidence: { sourceFileId: "weekly", blockId: "block-1", excerpt: "完成制造系统异常闭环" } };
+    await env.store.saveDraft("2026-10-27", { files: [{ reportType: "info-weekly" }], digestCandidates: { headline, highlights: [], watchItems: [] }, quality: { issues: [] } });
+
+    const approve = () => request(env.routes, { method: "POST", path: "/api/import/periods/2026-10-27/approve", headers: CSRF, body: JSON.stringify({ actor: "信息部" }) });
+    assert.equal((await approve()).status, 409);
+    const reviewed = await request(env.routes, { method: "POST", path: "/api/import/periods/2026-10-27/digest/review", headers: CSRF, body: JSON.stringify({ actor: "信息部", selected: { headline, highlights: [], watchItems: [] } }) });
+    assert.equal(reviewed.status, 200);
+    assert.equal(reviewed.value.reviewed, true);
+    assert.equal((await approve()).status, 200);
+  } finally { await env.cleanup(); }
+});

@@ -26,7 +26,7 @@ async function run(task) {
 
 /** 表单提交期间禁用按钮，避免重复点击造成重复发布 */
 async function submit(form, task) {
-  const button = form.querySelector("button");
+  const button = form.querySelector('button[type="submit"]') || form.querySelector("button");
   button.disabled = true;
   try {
     return await task();
@@ -95,6 +95,35 @@ document.querySelector("#approve-form").addEventListener("submit", (event) => {
     await api.approve(periodId, new FormData(form).get("actor"));
     await refresh();
     announce("审核已确认");
+  }));
+});
+
+root.addEventListener("click", (event) => {
+  const move = event.target.closest("[data-move]");
+  if (!move) return;
+  const entry = move.closest(".digest-entry");
+  const sibling = move.dataset.move === "up" ? entry.previousElementSibling : entry.nextElementSibling;
+  if (!sibling?.classList.contains("digest-entry")) return;
+  if (move.dataset.move === "up") sibling.before(entry);
+  else sibling.after(entry);
+});
+
+root.addEventListener("submit", (event) => {
+  if (event.target.id !== "digest-form") return;
+  event.preventDefault();
+  const form = event.target;
+  submit(form, () => run(async () => {
+    const candidates = state.draft.digestCandidates;
+    const selection = (kind) => [...form.querySelectorAll(`[data-kind="${kind}"] .digest-entry`)]
+      .filter((entry) => entry.querySelector('input[type="checkbox"]').checked)
+      .map((entry) => ({ ...candidates[kind][Number(entry.dataset.index)], text: entry.querySelector("textarea").value.trim() }));
+    const selected = {
+      headline: { ...candidates.headline, text: form.querySelector("#digest-headline").value.trim() },
+      highlights: selection("highlights"), watchItems: selection("watchItems"),
+    };
+    await api.reviewDigest(periodId, { actor: new FormData(form).get("actor"), selected });
+    await refresh();
+    announce("导读已审核保存");
   }));
 });
 

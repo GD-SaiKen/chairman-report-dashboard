@@ -1,4 +1,5 @@
 import { RADAR_DECISIONS, RADAR_TYPES, DEMAND_STATES, CAPABILITY_TYPES } from "../../js/core/dashboard-schema.js";
+import { canPublishDigest } from "./digest.mjs";
 
 const AIKEY = /aikey/i;
 
@@ -150,5 +151,6 @@ export function mergeDraft({ files = [], ruleResults = [], aiResults = [], curat
 }
 
 export function canApproveDraft(draft) {
-  return !(draft.quality?.issues || []).some((issue) => issue.severity === "blocking" && !issue.resolved);
+  const needsDigest = (draft.files || []).some((file) => file.reportType === "info-weekly" || file.publishOriginal);
+  return (!needsDigest || canPublishDigest(draft.digest)) && !(draft.quality?.issues || []).some((issue) => issue.severity === "blocking" && !issue.resolved);
 }

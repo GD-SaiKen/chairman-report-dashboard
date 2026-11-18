@@ -1,7 +1,7 @@
 import { h, icon } from "./shared.js";
 
 const NAV = [
-  ["overview", "公司总览", "layout-dashboard"],
+  ["overview", "报告导读", "file-text"],
   ["departments", "部门 AI 采用", "users"],
   ["demands", "AI 需求机会", "list-checks"],
   ["capabilities", "Skills & Agents", "layers"],
@@ -10,11 +10,11 @@ const NAV = [
 ];
 
 export function renderBrand(site) {
-  return h("div", { class: "brand" }, h("a", { class: "brand__mark", href: "#overview", "aria-label": "回到公司总览" }, icon("layout-dashboard")), h("div", null, h("p", { class: "brand__name", text: site.title }), h("p", { class: "brand__sub", text: site.subtitle })));
+  return h("div", { class: "brand" }, h("a", { class: "brand__mark", href: "#overview", "aria-label": "回到公司总览" }, icon("layout-dashboard")), h("div", null, h("p", { class: "brand__title", text: site.title }), h("p", { class: "brand__sub", text: site.subtitle })));
 }
 
 export function renderNav(route) {
-  return h("nav", { class: "nav", "aria-label": "驾驶舱专题" }, h("p", { class: "nav__label", text: "公司 AI 运转" }), ...NAV.map(([id, label, iconName]) => h("a", { class: `nav__link ${route === id ? "is-active" : ""}`, href: `#${id}`, "data-route": id, "aria-current": route === id ? "page" : null }, icon(iconName), h("span", { text: label }))));
+  return h("nav", { class: "nav", "aria-label": "报告与专题" }, h("p", { class: "nav__label", text: "信息部报告" }), ...NAV.map(([id, label, iconName]) => h("a", { class: `nav__link ${route === id ? "is-active" : ""}`, href: `#${id}`, "data-route": id, "aria-current": route === id ? "page" : null }, icon(iconName), h("span", { text: label }))));
 }
 
 export function renderSidebarFoot(period, quality) {

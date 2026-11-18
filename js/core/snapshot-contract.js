@@ -112,6 +112,7 @@ function normalizeInput(input = {}) {
     tokens: isList(input.tokens) ? input.tokens.filter(isObject).map(normalizeToken) : UNKNOWN,
     radar: isList(input.radar) ? input.radar.filter(isObject) : UNKNOWN,
     report: isObject(input.report) ? input.report : UNKNOWN,
+    digest: isObject(input.digest) ? input.digest : UNKNOWN,
     quality: isObject(input.quality) ? input.quality : UNKNOWN,
     radarUpdatedAt: input.radarUpdatedAt ?? UNKNOWN,
     validMessages: n(input.validMessages),
@@ -419,6 +420,7 @@ export function buildSnapshotFiles(rawInput = {}) {
       capabilities: buildCapabilitySummary(input.capabilities, input.capabilityRuns),
       tokens: tokenSummary,
       report: buildReport(input.report),
+      digest: input.digest ?? UNKNOWN,
       quality,
     },
     departments: { departments: buildDepartments(input.departments) },
@@ -452,6 +454,12 @@ const CAPABILITY_SUMMARY_KEYS = ["total", "active", "skills", "agents", "automat
 
 function validateOverview(overview, errors) {
   if (!isObject(overview)) { errors.push("overview must be an object"); return; }
+  if (overview.digest != null) {
+    const digest = overview.digest;
+    if (!isObject(digest) || typeof digest.headline !== "string" || !Array.isArray(digest.highlights) || !Array.isArray(digest.watchItems) || digest.highlights.length > 3 || digest.watchItems.length > 2 || ![...digest.highlights, ...digest.watchItems].every((item) => typeof item === "string")) {
+      errors.push("overview.digest must contain a headline and up to three highlights and two watch items");
+    }
+  }
   for (const key of ["period", "kpis", "demandFunnel", "capabilities", "tokens", "quality"]) {
     if (!(key in overview)) errors.push(`overview.${key} is required`);
   }

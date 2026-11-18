@@ -93,6 +93,35 @@ test("renders every topic view without leaking undefined or NaN", () => {
   }
 });
 
+test("overview leads with report digest and a prominent same-site full report link", () => {
+  const uninstall = installDom();
+  try {
+    const snapshot = buildImportSnapshot();
+    snapshot.overview.report = { title: "信息部周报", window: "本期", localPath: "/reports/current/index.html" };
+    snapshot.overview.digest = { headline: "重点结论", highlights: ["已交付异常看板"], watchItems: ["待确认同步状态"] };
+    const html = serialize(renderOverview(snapshot));
+    assert.ok(html.indexOf("重点结论") < html.indexOf("关键数据"));
+    assert.ok(html.includes('href="/reports/current/index.html"'));
+    assert.ok(html.includes("已交付异常看板"));
+    assert.ok(html.includes("待确认同步状态"));
+    // 数字没有语义色：KPI 不应再输出无样式的装饰性修饰类
+    assert.doesNotMatch(html, /dash-kpi--/);
+    // 条形图数值必须挂到 .dash-bar-value 上，否则右对齐与字重都不生效
+    assert.match(html, /<b class="dash-bar-value">/);
+  } finally { uninstall(); }
+});
+
+test("overview identifies available data sources without presenting reconciliation as usage", () => {
+  const uninstall = installDom();
+  try {
+    const snapshot = buildImportSnapshot();
+    snapshot.quality.sources = [{ id: "sino", asOf: "2026-10-17", status: "ok" }, { id: "aikey", status: "warning" }];
+    const html = serialize(renderOverview(snapshot));
+    assert.match(html, /核对来源：Sino WebUI（2026-10-17）/);
+    assert.doesNotMatch(html, /核对来源：[^<]*aikey/);
+  } finally { uninstall(); }
+});
+
 test("renders departments whose numeric fields are absent from the data", () => {
   const uninstall = installDom();
   try {

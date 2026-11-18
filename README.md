@@ -1,5 +1,9 @@
 # 信息部与 Hermes 项目报告
 
+当前首页以信息部 HTML 周报为主：首屏呈现本期结论和本站“阅读全文”入口，之后是关键进展、待关注事项及专题数据。微信分享本站域名即可阅读导读与同域名全文。历史期次通过页首下拉切换。
+
+新报告在 `/manage/import/` 上传时选择“信息部周报”（默认勾选发布全文）。解析会按原文段落生成带证据的导读候选；审核人可编辑、舍弃和排序，保存审核后才可批准发布。发布时会把净化后的单文件 HTML 放入 `reports/{期次}-{版本}/index.html` 并自动登记全文入口。带未上传的相对 CSS、图片或其他本地资源的 HTML 会被拒绝，请先导出为单文件 HTML。旧快照没有导读字段时仍可查看已有报告入口和专题数据。
+
 信息部周报与 Hermes 双周报的**一屏判断面板**：站内只看结论（红灯、黄灯、待决策），下钻回到两份报告全文。
 
 ---
@@ -156,7 +160,7 @@ reports/{YYYY-MM-DD}_{YYYY-MM-DD}/
 ```
 
 - 报告自带的 css/图片放在同一子目录，用相对路径引用；不要改站点的 `css/`、`js/`（`report-return.css` 除外，由全文页引用）。
-- `onlineUrl` 可选：有 WorkBuddy 等线上原件就填，没有可只保留 `localPath`。
+- 首页只使用本站 `localPath`。旧的外部在线链接不作为阅读入口。
 
 ### 6.2 登记 manifest.json
 
@@ -194,45 +198,25 @@ reports/{YYYY-MM-DD}_{YYYY-MM-DD}/
 | `label` / `window` / `asOf` | 期次名、数据窗口、数据截止时间 |
 | `files` | 七个专题快照的相对站点根路径，**七个键缺一不可**，否则 `validateManifest` 直接报错 |
 
-报告全文入口来自 `overview.json` 的 `report` 字段（`title` / `window` / `localPath` / `onlineUrl`），制造类红线与风险等判断同样取自专题快照，不再另设入口清单。
+报告全文入口来自 `overview.json` 的 `report.localPath`。导入工作台发布时会自动生成该路径，并将审核后的导读写入 `overview.digest`。
 
-可复制模板（按需改文案与路径）：
+手工维护旧快照时，导读字段示例：
 
 ```json
 {
-  "id": "2026-10-13",
-  "label": "2026-10-13 期",
-  "window": "2026-10-13 ~ 10-27（跨两周）",
-  "updated": "2026-10-27",
-  "meters": [
-    { "value": "0", "unit": "条", "label": "有效需求消息", "hint": "Sino 应用侧", "source": "sino" }
-  ],
-  "judgments": [
-    { "text": "本期一句话结论。", "source": "deck" }
-  ],
-  "risks": [
-    { "level": "amber", "fact": "事实描述。", "meaning": "对管理层的含义。" }
-  ],
-  "decisions": [
-    { "item": "待办事项", "owner": "责任人", "status": "待处理", "tone": "watch" }
-  ],
-  "reports": [
-    {
-      "id": "info-dept-weekly",
-      "title": "信息部周报",
-      "window": "2026-10-13 ~ 10-27",
-      "scope": "六条数据源摘要",
-      "localPath": "reports/2026-10-13_10-27/info-dept-weekly/index.html",
-      "onlineUrl": "https://example.app.workbuddy.host/"
-    }
-  ]
+  "report": { "title": "信息部周报", "window": "2026-10-13 ~ 10-27", "localPath": "reports/2026-10-13_10-27/info-dept-weekly/index.html" },
+  "digest": {
+    "headline": "本期一句话结论。",
+    "highlights": ["关键进展一。", "关键进展二。"],
+    "watchItems": ["待关注事项。"]
+  }
 }
 ```
 
 ### 6.3 接入后自检
 
 - `npm start` 打开首页，期次下拉能选到新期。
-- 「阅读全文」能打开本地 `index.html`；若有 `onlineUrl`，「线上原件」可打开。
+- 「阅读全文」能打开本站 `index.html`，并可返回导读。
 - 旧期仍保留在 `periods` 中；浏览器会记住上次选择的期次。
 
 ### 6.4 推送到 GitHub

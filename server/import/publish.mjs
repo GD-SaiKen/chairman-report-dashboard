@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { validateManifest } from "../../js/core/dashboard-schema.js";
 import { SNAPSHOT_FILES, buildSnapshotFiles, validateSnapshotFiles } from "../../js/core/snapshot-contract.js";
 import { canApproveDraft } from "./merge-draft.mjs";
+import { sanitizeHtml } from "./sanitize.mjs";
 
 const writeJson = (path, value) => writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 const sha = (value) => createHash("sha256").update(value).digest("hex");
@@ -30,7 +31,8 @@ export function snapshotFromDraft(draft = {}, extra = {}) {
     tokens: candidates.tokens,
     // 雷达只有审核通过的才进入正式快照，候选一律不放行
     radar: Array.isArray(radar) ? radar.filter((item) => item.reviewStatus === "approved") : radar,
-    report: curation.report,
+    report: extra.report ?? curation.report,
+    digest: draft.digest ? { headline: draft.digest.headline.text, highlights: draft.digest.highlights.map((item) => item.text), watchItems: draft.digest.watchItems.map((item) => item.text), reviewer: draft.digest.reviewer } : null,
     quality: {
       status: draft.quality?.status ?? "missing",
       generatedAt: extra.generatedAt ?? null,
@@ -44,11 +46,20 @@ export function snapshotFromDraft(draft = {}, extra = {}) {
 }
 
 export async function publishDraft({ periodId, draft, root, storageRoot, actor }) {
-  if (!canApproveDraft(draft)) throw new Error("draft contains unresolved blocking issues");
+  if (!canApproveDraft(draft)) throw new Error("draft contains unresolved blocking issues or unreviewed digest");
 
   const releaseId = `${Date.now()}-${randomUUID().slice(0, 8)}`;
   const generatedAt = new Date().toISOString();
-  const snapshot = snapshotFromDraft(draft, { generatedAt, radarUpdatedAt: dateOnly(generatedAt) });
+  const primary = (draft.files || []).find((file) => file.reportType === "info-weekly") || (draft.files || []).find((file) => file.publishOriginal);
+  let reportHtml = null;
+  const reportPath = primary ? `reports/${periodId}-${releaseId}/index.html` : null;
+  if (primary) {
+    const source = await readFile(resolve(storageRoot, "uploads", periodId, "files", `${primary.fileId}.html`), "utf8");
+    const cleaned = sanitizeHtml(source);
+    assertStandaloneHtml(cleaned.document, cleaned.html);
+    reportHtml = cleaned.html.replace(/<\/body>/i, '<a class="report-return" href="../../index.html">← 返回导读</a><style>.report-return{position:fixed;z-index:9999;left:16px;bottom:16px;padding:12px 18px;background:#2e5bc4;color:white!important;text-decoration:none;border-radius:4px;font:600 14px system-ui;box-shadow:0 4px 16px #17203333}@media print{.report-return{display:none}}</style></body>');
+  }
+  const snapshot = snapshotFromDraft(draft, { generatedAt, radarUpdatedAt: dateOnly(generatedAt), report: primary ? { title: primary.title, window: draft.period.window, localPath: reportPath, onlineUrl: null } : undefined });
 
   // 发布前强制契约校验：宁可发布失败，也不让半份快照落盘
   const checked = validateSnapshotFiles(snapshot);
@@ -58,6 +69,13 @@ export async function publishDraft({ periodId, draft, root, storageRoot, actor }
   const liveDir = resolve(root, "data", "snapshots", versionName);
   // 暂存目录放在 storageRoot 下，避免半成品进项目仓库
   const tempDir = resolve(storageRoot, ".publish-tmp", versionName);
+  const reportDir = reportPath ? resolve(root, "reports", `${periodId}-${releaseId}`) : null;
+  const releaseDir = resolve(storageRoot, "releases", releaseId);
+  const manifestTemp = resolve(root, "data", `manifest.${releaseId}.tmp`);
+  let installedReport = false;
+  let installedSnapshot = false;
+  let installedRelease = false;
+  let manifestCommitted = false;
   await mkdir(tempDir, { recursive: true });
   try {
     for (const name of SNAPSHOT_FILES) await writeJson(join(tempDir, `${name}.json`), snapshot[name]);
@@ -74,23 +92,49 @@ export async function publishDraft({ periodId, draft, root, storageRoot, actor }
     const manifestChecked = validateManifest(manifest);
     if (!manifestChecked.ok) throw new Error(`manifest invalid: ${manifestChecked.errors.join("; ")}`);
 
+    if (reportDir) {
+      await mkdir(reportDir, { recursive: true });
+      await writeFile(join(reportDir, "index.html"), reportHtml, "utf8");
+      installedReport = true;
+    }
     await mkdir(resolve(root, "data", "snapshots"), { recursive: true });
     await rename(tempDir, liveDir);
+    installedSnapshot = true;
 
     const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
-    const manifestTemp = resolve(root, "data", `manifest.${releaseId}.tmp`);
     await writeFile(manifestTemp, manifestText, "utf8");
-    await rename(manifestTemp, resolve(root, "data", "manifest.json"));
-
-    const releaseDir = resolve(storageRoot, "releases", releaseId);
     await mkdir(releaseDir, { recursive: true });
+    installedRelease = true;
     await writeJson(join(releaseDir, "release.json"), { releaseId, periodId, actor, createdAt: generatedAt, manifest, manifestSha256: sha(manifestText) });
+    await rename(manifestTemp, resolve(root, "data", "manifest.json"));
+    manifestCommitted = true;
 
     return { releaseId, periodId, manifest };
+  } catch (error) {
+    if (!manifestCommitted) {
+      if (installedReport) await rm(reportDir, { recursive: true, force: true });
+      if (installedSnapshot) await rm(liveDir, { recursive: true, force: true });
+      if (installedRelease) await rm(releaseDir, { recursive: true, force: true });
+      await rm(manifestTemp, { force: true });
+    }
+    throw error;
   } finally {
     // 任何一步失败都清掉暂存目录，避免留下脏快照
     await rm(tempDir, { recursive: true, force: true });
   }
+}
+
+function assertStandaloneHtml(document, html) {
+  const visit = (node) => {
+    for (const attr of node.attrs || []) {
+      if (!["href", "src", "poster"].includes(attr.name)) continue;
+      const value = attr.value.trim();
+      if (value && !/^(#|data:image\/|mailto:|tel:|https?:\/\/)/i.test(value)) throw new Error(`报告引用了未上传的本地资源：${value}`);
+    }
+    for (const child of node.childNodes || []) visit(child);
+  };
+  visit(document);
+  if (/@import\b|url\(\s*['"]?(?!data:image\/)/i.test(html)) throw new Error("报告包含未上传的本地资源，请使用单文件 HTML");
 }
 
 export async function rollbackRelease({ releaseId, root, storageRoot, actor }) {

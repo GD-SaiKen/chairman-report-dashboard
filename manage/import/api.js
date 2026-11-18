@@ -54,6 +54,7 @@ export function createImportApi(base = "/api/import") {
     upload: (id, form) => request(`/periods/${id}/files`, { method: "POST", body: form }),
     extract: (id) => request(`/periods/${id}/extract`, { method: "POST" }),
     saveDraft: (id, value) => request(`/periods/${id}/draft`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(value) }),
+    reviewDigest: (id, value) => request(`/periods/${id}/digest/review`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value) }),
     approve: (id, actor) => request(`/periods/${id}/approve`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor }) }),
     publish: (id, actor) => request(`/periods/${id}/publish`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor }) }),
   };

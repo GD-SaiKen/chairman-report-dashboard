@@ -5,6 +5,7 @@ import { parseCookies, validateCsrf, validateOrigin } from "./security.mjs";
 import { receiveHtmlUpload } from "./upload.mjs";
 import { extractPeriod, loadPeriodCuration } from "./pipeline.mjs";
 import { canApproveDraft } from "./merge-draft.mjs";
+import { reviewDigest } from "./digest.mjs";
 import { transitionImport } from "./state-machine.mjs";
 import { diffSnapshots } from "./diff.mjs";
 import { listReleases, loadPublishedSnapshot, publishDraft, rollbackRelease, snapshotFromDraft } from "./publish.mjs";
@@ -85,6 +86,7 @@ export function createImportRoutes({ store, config, services = {} }) {
       if (req.method === "PATCH" && parts[4] === "draft") {
         secure(req, config);
         const patch = await readJsonBody(req);
+        if (patch.draft && ["digest", "digestCandidates", "files"].some((key) => Object.hasOwn(patch.draft, key))) throw new HttpError(422, "DIGEST_REVIEW_REQUIRED", "导读请在专用审核表单中提交");
         const actor = String(patch.actor || "").trim();
         if (!actor) throw new HttpError(422, "ACTOR_REQUIRED", "请填写审核人显示名");
         const next = await store.transaction(periodId, async () => {
@@ -97,6 +99,23 @@ export function createImportRoutes({ store, config, services = {} }) {
         json(res, 200, next);
         return true;
       }
+      if (req.method === "POST" && parts[4] === "digest" && parts[5] === "review") {
+        secure(req, config);
+        const { actor, selected } = await readJsonBody(req);
+        const digest = await store.transaction(periodId, async () => {
+          const period = await store.getPeriod(periodId);
+          if (!period || !["review_required", "failed"].includes(period.status)) throw new HttpError(409, "REVIEW_STATE_REQUIRED", "当前期次不能修改导读");
+          const draft = await store.getDraft(periodId);
+          if (!draft?.digestCandidates) throw new HttpError(422, "DIGEST_CANDIDATES_MISSING", "未提取到导读候选，请先解析报告");
+          let reviewed;
+          try { reviewed = reviewDigest(draft.digestCandidates, selected || {}, actor); }
+          catch (error) { throw new HttpError(422, "DIGEST_INVALID", error.message); }
+          await store.saveDraft(periodId, { ...draft, digest: reviewed, revisions: [...(draft.revisions || []), { at: new Date().toISOString(), actor, type: "digest_review" }] });
+          return reviewed;
+        });
+        json(res, 200, digest);
+        return true;
+      }
       if (req.method === "POST" && parts[4] === "approve") {
         secure(req, config);
         const { actor } = await readJsonBody(req);
@@ -104,7 +123,7 @@ export function createImportRoutes({ store, config, services = {} }) {
         const period = await store.transaction(periodId, async () => {
           const current = await store.getPeriod(periodId);
           if (!current) throw new HttpError(404, "PERIOD_NOT_FOUND", "期次草稿不存在");
-          if (!canApproveDraft(await store.getDraft(periodId))) throw new HttpError(409, "BLOCKING_ISSUES", "仍有未解决的阻断问题");
+          if (!canApproveDraft(await store.getDraft(periodId))) throw new HttpError(409, "BLOCKING_ISSUES", "请先完成导读审核并解决阻断问题");
           const approved = { ...current, status: transitionImport(current.status, "approved") };
           await store.savePeriod(periodId, approved);
           return approved;

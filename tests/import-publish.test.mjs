@@ -84,6 +84,41 @@ test("publishDraft writes the release and leaves no staging directory behind", a
   }
 });
 
+test("publishes reviewed digest and sanitized standalone HTML under the same origin", async () => {
+  const env = await makeEnv();
+  try {
+    const draft = await approvedDraft();
+    draft.files = [{ fileId: "weekly", title: "信息部周报", reportType: "info-weekly", publishOriginal: true }];
+    draft.digestCandidates = { headline: { text: "本期进展", evidence: { sourceFileId: "weekly", blockId: "block-1" } }, highlights: [], watchItems: [] };
+    draft.digest = { ...draft.digestCandidates, reviewed: true, reviewer: "信息部" };
+    const upload = join(env.storageRoot, "uploads", "2026-10-27", "files");
+    await mkdir(upload, { recursive: true });
+    await writeFile(join(upload, "weekly.html"), '<!doctype html><html><body><h1 id="top">报告</h1><a href="#top">返回</a><script>alert(1)</script></body></html>');
+    await publishDraft({ periodId: "2026-10-27", draft, root: env.root, storageRoot: env.storageRoot, actor: "信息部" });
+    const manifest = JSON.parse(await readFile(join(env.root, "data", "manifest.json"), "utf8"));
+    const overview = JSON.parse(await readFile(join(env.root, manifest.periods[0].files.overview), "utf8"));
+    assert.equal(overview.digest.headline, "本期进展");
+    assert.match(overview.report.localPath, /^reports\/2026-10-27-/);
+    const html = await readFile(join(env.root, overview.report.localPath), "utf8");
+    assert.match(html, /href="#top"/);
+    assert.doesNotMatch(html, /<script/);
+    assert.match(html, /返回导读/);
+  } finally { await env.cleanup(); }
+});
+
+test("rejects HTML with missing local assets before publishing", async () => {
+  const env = await makeEnv();
+  try {
+    const draft = await approvedDraft();
+    draft.files = [{ fileId: "weekly", title: "信息部周报", reportType: "info-weekly", publishOriginal: true }];
+    draft.digest = { headline: { text: "本期进展", evidence: { sourceFileId: "weekly", blockId: "block-1" } }, highlights: [], watchItems: [], reviewed: true, reviewer: "信息部" };
+    const upload = join(env.storageRoot, "uploads", "2026-10-27", "files");
+    await mkdir(upload, { recursive: true });
+    await writeFile(join(upload, "weekly.html"), '<html><head><link rel="stylesheet" href="style.css"></head><body>报告</body></html>');
+    await assert.rejects(() => publishDraft({ periodId: "2026-10-27", draft, root: env.root, storageRoot: env.storageRoot, actor: "信息部" }), /本地资源/);
+  } finally { await env.cleanup(); }
+});
+
 test("a failed publish leaves no staged snapshot or partial manifest behind", async () => {
   const env = await makeEnv();
   try {

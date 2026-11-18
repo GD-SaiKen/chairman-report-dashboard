@@ -41,6 +41,41 @@ export function renderWorkbench(root, state) {
   root.querySelector("#issues").replaceChildren(...(issues.length
     ? issues.map((issue) => h("li", null, h("strong", { text: issue.code || "问题" }), ` ${issue.message || ""}`))
     : [h("li", { text: "暂无质量问题" })]));
+
+  let form = root.querySelector("#digest-form");
+  if (!form) {
+    form = h("form", { id: "digest-form", class: "digest-form" });
+    root.querySelector("#approve-form").before(form);
+  }
+  const candidates = state.draft?.digestCandidates;
+  form.hidden = !candidates || !["review_required", "failed"].includes(period.status);
+  if (!form.hidden) {
+    const reviewed = state.draft.digest;
+    const same = (a, b) => a?.evidence?.sourceFileId === b?.evidence?.sourceFileId && a?.evidence?.blockId === b?.evidence?.blockId;
+    const entries = (kind, label, items, limit) => h("fieldset", { class: "digest-group", "data-kind": kind },
+      h("legend", { text: `${label}（最多 ${limit} 项）` }),
+      items.map((item, index) => {
+        const selected = reviewed?.[kind]?.find((value) => same(value, item));
+        return h("div", { class: "digest-entry", "data-index": String(index) },
+          h("label", null, h("input", { type: "checkbox", checked: reviewed ? Boolean(selected) : index < limit }), "保留"),
+          h("textarea", { rows: "3", text: selected?.text || item.text, "aria-label": `${label} ${index + 1}` }),
+          h("small", { text: `原文：${item.evidence?.excerpt || item.text}` }),
+          h("div", null, h("button", { type: "button", "data-move": "up", text: "上移" }), h("button", { type: "button", "data-move": "down", text: "下移" }))
+        );
+      })
+    );
+    form.replaceChildren(
+      h("h3", { text: "报告导读审核" }),
+      h("p", { text: "核对原文后编辑和排序。保存后才能批准发布。" }),
+      h("label", { for: "digest-headline", text: "一句话结论" }),
+      h("textarea", { id: "digest-headline", rows: "3", text: reviewed?.headline?.text || candidates.headline?.text || "", required: true }),
+      h("small", { text: `原文：${candidates.headline?.evidence?.excerpt || "未提取到结论，请检查报告"}` }),
+      entries("highlights", "关键进展", candidates.highlights || [], 3),
+      entries("watchItems", "待关注", candidates.watchItems || [], 2),
+      h("label", null, "审核人", h("input", { name: "actor", required: true, value: reviewed?.reviewer || "" })),
+      h("button", { type: "submit", text: "保存导读审核" })
+    );
+  }
 }
 
 /** 把操作失败显示在页面上，替代原先被吞掉的未处理 Promise 拒绝 */
