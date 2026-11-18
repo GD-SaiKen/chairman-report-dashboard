@@ -44,3 +44,10 @@ test("valid records pass", () => {
   assert.equal(validateTokenRecord({ id: "t1", classification: "business", input: 1 }).ok, true);
   assert.equal(validateRadarItem({ id: "r1", name: "工具", type: "ai-tool", decision: "watch", reviewStatus: "approved" }).ok, true);
 });
+
+test("demands may carry an unknown department as explicit null", () => {
+  // 规则抽取拿不到部门时必须留 null，页面显示「—」；若这里报错，导入期次会被自己的
+  // 校验刷出十几条「departmentId is required」警告，把真正的质量提醒淹没。
+  assert.equal(validateDemand({ id: "d1", departmentId: null, title: "良率分析" }).ok, true);
+  assert.equal(validateDemand({ id: "d1", title: "良率分析" }).ok, false);
+});

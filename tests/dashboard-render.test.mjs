@@ -170,3 +170,17 @@ test("department rows show em dash for unknown numbers and expose the drill-down
     uninstall();
   }
 });
+
+test("demand funnel explains missing stages instead of showing a row of zeros", () => {
+  const uninstall = installDom();
+  try {
+    // 导入周报只给「需求主题」表，没有分阶段状态：漏斗不能写成 0/0/0/0/0
+    const snapshot = buildImportSnapshot();
+    snapshot.overview.demandFunnel = { counts: { captured: 0, assessed: 0, designed: 0, delivered: 0, reused: 0, closed: 0 }, total: 1, opportunities: 0 };
+    const html = serialize(renderDemands(snapshot, {}));
+    assert.match(html, /未提供需求的分阶段状态/);
+    assert.doesNotMatch(html, /funnel__step/);
+  } finally {
+    uninstall();
+  }
+});

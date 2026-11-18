@@ -25,6 +25,18 @@ export function detectHtmlEncoding(buffer) {
   throw new HttpError(422, "ENCODING_REQUIRED", "无法确定 HTML 编码，请将报告另存为 UTF-8 后重新上传。");
 }
 
+/**
+ * busboy 按 latin1 解码 multipart 里的 filename，中文名会变成乱码。
+ * 浏览器始终发 UTF-8 字节，所以按 latin1 取回字节再按 UTF-8 解一次即可；
+ * 纯 ASCII 名往返不变，解码失败（出现替换字符）时保留原值。
+ */
+export function decodeFilename(value) {
+  const text = String(value || "");
+  if (!text || !/[^\x00-\x7F]/.test(text)) return text;
+  const decoded = Buffer.from(text, "latin1").toString("utf8");
+  return decoded.includes("\uFFFD") ? text : decoded;
+}
+
 async function readHead(path, size = 4096) {
   const handle = await open(path, "r");
   try {
@@ -127,13 +139,14 @@ function receiveToDisk(req, { dir, config, usedBytes }) {
 /** 落盘后做编码与去重校验，再登记到期次草稿 */
 async function finalizeUpload({ fields, filename, mime, bytes, sha256, fileId, temp, dir, period, periodId, store }) {
   const target = join(dir, `${fileId}.html`);
+  const safeName = decodeFilename(filename);
   try {
     detectHtmlEncoding(await readHead(temp));
     if (period.files.some((file) => file.sha256 === sha256)) throw new HttpError(409, "DUPLICATE_FILE", "同一文件已经加入本期草稿");
     await rename(temp, target);
     const file = {
-      fileId, filename,
-      title: fields.title || filename,
+      fileId, filename: safeName,
+      title: fields.title || safeName,
       reportType: fields.reportType || "other",
       departmentId: fields.departmentId || null,
       publishOriginal: fields.publishOriginal === "true",

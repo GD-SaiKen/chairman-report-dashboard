@@ -72,7 +72,8 @@ export function validateDemand(raw) {
   object(raw, "demand", errors);
   if (!raw) return RESULT(errors);
   required(raw.id, "demand.id", errors);
-  required(raw.departmentId, "demand.departmentId", errors);
+  // 部门未知时导入链路会留 null（绝不猜一个部门），所以只要求键存在
+  if (!("departmentId" in raw)) errors.push("departmentId must be present (use null when unknown)");
   required(raw.title, "demand.title", errors);
   oneOf(raw.status, DEMAND_STATES, "demand.status", errors);
   return RESULT(errors);

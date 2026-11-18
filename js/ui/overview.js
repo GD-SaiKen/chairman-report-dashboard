@@ -39,7 +39,7 @@ export function renderOverview(snapshot) {
     )) : null,
     section("关键数据", "仅展示本期可核对的运营信号", h("div", { class: "dash-kpis" },
       kpi("活跃部门", kpis.activeDepartments, "一级部门"), kpi("活跃人员", kpis.activeUsers, "产生有效业务需求"),
-      kpi("有效需求", kpis.validDemands, "去重后业务请求"), kpi("活跃 Agents", kpis.activeAgents, `${fmt(capabilities.runs)} 次运行`)
+      kpi("需求条目", kpis.validDemands, "去重后的需求条目"), kpi("活跃 Agents", kpis.activeAgents, `${fmt(capabilities.runs)} 次运行`)
     ), sourceLine ? h("p", { class: "dash-source", text: `核对来源：${sourceLine}` }) : null),
     section("专题数据", "需要进一步核对时，进入对应专题", h("div", { class: "digest-topics" },
       panel("部门采用", `${departments.length} 个部门`, departments.length ? h("div", { class: "dash-bars" }, departments.slice(0, 5).map((item) => bar(item.activeUsers || 0, maxUsers, item.name))) : null, linkButton("departments", "查看部门")),
